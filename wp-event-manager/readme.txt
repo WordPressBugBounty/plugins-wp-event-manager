@@ -3,10 +3,10 @@
 Contributors: wpeventmanager,ashokdudhat,krinay
 Donate link: https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=55FRYATTFLA5N
 Tags: calendar, event, events, organizer, tickets
-Requires at least: 5.4.1
+Requires at least: 6.0.1
 Tested up to: 6.6.2
-Stable Tag: 3.1.45.1
-Requires PHP: 5.6
+Stable tag: 3.1.45
+Requires PHP: 7.2
 License: GPLv3
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
 
@@ -340,10 +340,6 @@ WordPress does not have a built-in event calendar. However, if you want to add a
 
 
 == Changelog ==
-
-= [3.1.45.1] 02-10-2024 =
-
-Fixed : Solved fatal error on event listing page on front end.
 
 = [3.1.45] 30-09-2024 =
 
