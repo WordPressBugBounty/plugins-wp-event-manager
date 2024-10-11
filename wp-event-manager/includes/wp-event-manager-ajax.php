@@ -162,17 +162,18 @@ class WP_Event_Manager_Ajax {
 		ob_start();
 		$events = get_event_listings(apply_filters('event_manager_get_listings_args', $args, $_REQUEST));
 		$result['found_events'] = false;
+		$fully_registered_events = 0;
 		if($events->have_posts()) : $result['found_events'] = true;
 			while ($events->have_posts()) : $events->the_post(); 
-				$registration_limit = get_post_meta( get_the_id(),'_registration_limit',true );
-				$registered_count = get_event_registration_count( get_the_id() );
-				
-				if ( $registration_limit && $registered_count && $registration_limit == $registered_count ) {
-					$fully_registered_events++;
-					continue;
-				}
-				get_event_manager_template_part('content', 'event_listing');
-			endwhile; ?>
+
+			$hide_event = apply_filters('wpem_hide_selected_event', false, get_the_id());
+			if($hide_event == true){
+				continue;
+			}
+				get_event_manager_template_part( 'content', 'event_listing' );
+			endwhile;
+			$events->found_posts -= $fully_registered_events;
+			?>
 		<?php else : 
 			$default_events = get_posts(array(
 					'numberposts' => -1,
