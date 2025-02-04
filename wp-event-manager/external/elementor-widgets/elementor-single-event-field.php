@@ -127,7 +127,7 @@ class Elementor_Event_Field extends Widget_Base {
                 [
                     'label' => 'Event Field Before HTML',
                     'type' => Controls_Manager::TEXTAREA,
-                    'placeholder' => __('Event Field Before HTML', 'elementor'),
+                    'placeholder' => __('Event Field Before HTML', 'wp-event-manager'),
                     'show_label' => false,
                 ]
        );
@@ -144,7 +144,7 @@ class Elementor_Event_Field extends Widget_Base {
                 [
                     'label' => 'Event Field After HTML',
                     'type' => Controls_Manager::TEXTAREA,
-                    'placeholder' => __('Event Field After HTML', 'elementor'),
+                    'placeholder' => __('Event Field After HTML', 'wp-event-manager'),
                     'show_label' => false,
                 ]
        );
@@ -193,7 +193,7 @@ class Elementor_Event_Field extends Widget_Base {
             } else if ($settings['event_field'] == 'event_banner') {
                 display_event_banner('full', '', $event);
             } else if ($settings['event_field'] == 'event_description') {
-                echo wp_kses_post(apply_filters('display_event_description', $event->post_content)); 
+                echo apply_filters('display_event_description', $event->post_content); 
             } else if ($settings['event_field'] == 'registration') {
                 $registration_end_date = get_event_registration_end_date($event);
                 $registration_end_date = !empty($registration_end_date) ? $registration_end_date.' 23:59:59' : '';
@@ -238,15 +238,15 @@ class Elementor_Event_Field extends Widget_Base {
             } else if ($settings['event_field'] == 'event_video_url') { ?>
                 <?php if (get_organizer_youtube($event)) : ?>
                     <div class="clearfix">&nbsp;</div>
-                    <button id="event-youtube-button" data-modal-id="wpem-youtube-modal-popup" class="wpem-theme-button wpem-modal-button"><?php _e('Watch video', 'wp-event-manager'); ?></button>
-                    <div id="wpem-youtube-modal-popup" class="wpem-modal" role="dialog" aria-labelledby="<?php _e('Watch video', 'wp-event-manager'); ?>">
+                    <button id="event-youtube-button" data-modal-id="wpem-youtube-modal-popup" class="wpem-theme-button wpem-modal-button"><?php esc_attr_e('Watch video', 'wp-event-manager'); ?></button>
+                    <div id="wpem-youtube-modal-popup" class="wpem-modal" role="dialog" aria-labelledby="<?php esc_attr_e('Watch video', 'wp-event-manager'); ?>">
                         <div class="wpem-modal-content-wrapper">
                             <div class="wpem-modal-header">
-                                <div class="wpem-modal-header-title"><h3 class="wpem-modal-header-title-text"><?php _e('Watch video', 'wp-event-manager'); ?></h3></div>
+                                <div class="wpem-modal-header-title"><h3 class="wpem-modal-header-title-text"><?php esc_attr_e('Watch video', 'wp-event-manager'); ?></h3></div>
                                 <div class="wpem-modal-header-close"><a href="javascript:void(0)" class="wpem-modal-close" id="wpem-modal-close">x</a></div>
                             </div>
                             <div class="wpem-modal-content">
-                                <?php echo  wp_oembed_get(get_organizer_youtube(), array('autoplay' => 1, 'rel' => 0)); ?>
+                                <?php echo wp_oembed_get(get_organizer_youtube(), array('autoplay' => 1, 'rel' => 0)); ?>
                             </div>
                         </div>
                         <a href="#"><div class="wpem-modal-overlay"></div></a>
@@ -355,15 +355,15 @@ class Elementor_Event_Field extends Widget_Base {
                                         <div class="wpem-icon">
                                             <p class="wpem-additional-info-block-title"><strong><?php echo esc_attr(wp_basename($event_field[$key])); ?></strong></p>
                                             <a target="_blank" class="wpem-icon-download3" href="<?php echo esc_url($event_field[$key]); ?>">
-                                                <?php echo _e('Download', 'wp-event-manager'); ?>
+                                                <?php echo esc_attr_e('Download', 'wp-event-manager'); ?>
                                             </a>
                                         </div>
                                         <?php
                                     } else {
-                                        echo wp_kses_post($event_field[$key]);
+                                        echo $event_field[$key];
                                     }
                                 } else {
-                                    echo wp_kses_post($event_field[$key]);
+                                    echo $event_field[$key];
                                 } ?>
                             </div>
                             <?php
@@ -371,45 +371,45 @@ class Elementor_Event_Field extends Widget_Base {
                     } else {
                         //for recurring event translation
                         if($event_field == 'no'){
-                            _e('Dont\'t repeat','wp-event-manager') ;
+                            esc_attr_e('Dont\'t repeat','wp-event-manager') ;
                         }elseif($event_field == 'daily'){
-                            _e('Daily','wp-event-manager') ;    
+                            esc_attr_e('Daily','wp-event-manager') ;    
                         }elseif($event_field == 'weekly'){
-                            _e('Weekly','wp-event-manager') ;
+                            esc_attr_e('Weekly','wp-event-manager') ;
                         }elseif($event_field == 'monthly'){
-                            _e('Monthly','wp-event-manager') ;    
+                            esc_attr_e('Monthly','wp-event-manager') ;    
                         }elseif($event_field == 'yearly'){
-                            _e('Yearly','wp-event-manager') ;    
+                            esc_attr_e('Yearly','wp-event-manager') ;    
                         }elseif($event_field == 'first'){
-                            _e('First','wp-event-manager') ;    
+                            esc_attr_e('First','wp-event-manager') ;    
                         }elseif($event_field == 'second'){
-                            _e('Second','wp-event-manager') ;    
+                            esc_attr_e('Second','wp-event-manager') ;    
                         }elseif($event_field == 'third'){
-                            _e('Third','wp-event-manager') ;    
+                            esc_attr_e('Third','wp-event-manager') ;    
                         }elseif($event_field == 'fourth'){
-                            _e('Fourth','wp-event-manager') ;    
+                            esc_attr_e('Fourth','wp-event-manager') ;    
                         }elseif($event_field == 'last'){
-                            _e('Last','wp-event-manager') ;    
+                            esc_attr_e('Last','wp-event-manager') ;    
                         }elseif($event_field == 'mon'){
-                            _e('Monday','wp-event-manager') ;    
+                            esc_attr_e('Monday','wp-event-manager') ;    
                         }elseif($event_field == 'tue'){
-                            _e('Tuesday','wp-event-manager') ;    
+                            esc_attr_e('Tuesday','wp-event-manager') ;    
                         }elseif($event_field == 'wed'){
-                            _e('Wednesday','wp-event-manager') ;    
+                            esc_attr_e('Wednesday','wp-event-manager') ;    
                         }elseif($event_field == 'thu'){
-                            _e('Thrusday','wp-event-manager') ;    
+                            esc_attr_e('Thrusday','wp-event-manager') ;    
                         }elseif($event_field == 'fri'){
-                            _e('Friday','wp-event-manager') ;    
+                            esc_attr_e('Friday','wp-event-manager') ;    
                         }elseif($event_field == 'sat'){
-                            _e('Saturday','wp-event-manager') ;    
+                            esc_attr_e('Saturday','wp-event-manager') ;    
                         }elseif($event_field == 'sun'){
-                            _e('Sunday','wp-event-manager') ;    
+                            esc_attr_e('Sunday','wp-event-manager') ;    
                         }elseif($event_field == 'same_time'){
-                            _e('same day','wp-event-manager') ;    
+                            esc_attr_e('same day','wp-event-manager') ;    
                         }elseif($event_field == 'specific_time'){
-                            _e('specific day','wp-event-manager') ;    
+                            esc_attr_e('specific day','wp-event-manager') ;    
                         }else{
-                            echo wp_kses_post($event_field);
+                            echo $event_field;
                         }
                     }
                 }

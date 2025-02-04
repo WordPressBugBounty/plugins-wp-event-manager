@@ -28,6 +28,7 @@ class WP_Event_Manager_Admin {
 		include_once 'wp-event-manager-setup.php';
 		include_once 'wp-event-manager-field-editor.php';
 		include_once 'wp-event-manager-shortcode-list.php';
+		include_once 'wp-event-manager-deactivation.php';
 
 		$this->settings_page = new WP_Event_Manager_Settings();
 
@@ -105,6 +106,7 @@ class WP_Event_Manager_Admin {
 		wp_enqueue_style('wp-event-manager-jquery-timepicker-css', EVENT_MANAGER_PLUGIN_URL . '/assets/js/jquery-timepicker/jquery.timepicker.min.css');
 		wp_register_script('wp-event-manager-jquery-timepicker', EVENT_MANAGER_PLUGIN_URL . '/assets/js/jquery-timepicker/jquery.timepicker.min.js', array('jquery', 'jquery-ui-core'), EVENT_MANAGER_VERSION, true);
 		wp_enqueue_script('wp-event-manager-jquery-timepicker');
+		
 	}
 
 	/**

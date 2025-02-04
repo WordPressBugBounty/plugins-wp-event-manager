@@ -141,7 +141,6 @@ class WP_Event_Manager_Settings{
 							'desc'        => __("If you are going to deal with Registration emails or Event emails then you need the sender's email appears in outgoing WP Event Manager emails.", 'wp-event-manager'), 
 							'type'        => 'email'
 						),
-						
 					),
 				),
 				'event_listings'       => array(
@@ -229,6 +228,55 @@ class WP_Event_Manager_Settings{
 							'label'      => __('Ticket Prices Filter', 'wp-event-manager'),
 							'cb_label'   => __('Enable Ticket prices filter for listing page.', 'wp-event-manager'),
 							'desc'       => __('Choose whether to enable ticket prices filter on the event listing page.', 'wp-event-manager'),
+							'type'       => 'checkbox',
+							'attributes' => array(),
+						),
+						array(
+							'name'       => 'enable_before_html',
+							'std'        => '0',
+							'label'      => __('Enable the Before HTML (below) on shortcodes.', 'wp-event-manager'),
+							'cb_label'   => __('Check this to show the Before HTML from the text area below on events displayed via shortcode.', 'wp-event-manager'),
+							'desc'       =>'',
+							'type'       => 'checkbox',
+							'attributes' => array(),
+						),
+						array(
+							'name'       => 'event_content_html',
+							'std'        => '',
+							'label'      => __('Add HTML before event content', 'wp-event-manager'),
+							'desc'       => __('You can add additional HTML content here that will be displayed before the event content.', 'wp-event-manager'),
+							'type'       => 'textarea', 
+							'attributes' => array(
+							'rows' => 5, 
+							'cols' => 50 
+							),
+						),
+						array(
+							'name'       => 'enable_after_html',
+							'std'        => '0',
+							'label'      => __('Enable the After HTML (below) on shortcodes.', 'wp-event-manager'),
+							'cb_label'   => __('Check this to show the After HTML from the text area below on events displayed via shortcode.', 'wp-event-manager'),
+							'desc'       => __('If enabled, the content will be displayed after the event template.', 'wp-event-manager'),
+							'type'       => 'checkbox',
+							'attributes' => array(),
+						),
+						array(
+							'name'       => 'event_content_after_html',
+							'std'        => '',
+							'label'      => __('Add HTML after event content', 'wp-event-manager'),
+							'desc'       => __('You can add additional HTML content here that will be displayed after the event content.', 'wp-event-manager'),
+							'type'       => 'textarea', 
+							'attributes' => array(
+								'rows' => 5, 
+								'cols' => 50 
+								),
+						),
+						array(
+							'name'       => 'event_manager_use_custom_thumbnail',
+							'std'        => '0',
+							'label'      => __('Use Event Thumbnail', 'wp-event-manager'),
+							'cb_label'   => __('Enable custom thumbnail for events.', 'wp-event-manager'),
+							'desc'       => __('If enabled, users can upload custom thumbnails for their event listings.', 'wp-event-manager'),
 							'type'       => 'checkbox',
 							'attributes' => array(),
 						),
@@ -368,6 +416,15 @@ class WP_Event_Manager_Settings{
 							'label'      => __('Ticket Prices', 'wp-event-manager'),
 							'cb_label'   => __('Enable Ticket prices for submission form.', 'wp-event-manager'),
 							'desc'       => __('Choose whether to enable ticket prices on the event submission page.', 'wp-event-manager'),
+							'type'       => 'checkbox',
+							'attributes' => array(),
+						),
+						array(
+							'name'       => 'event_manager_upload_custom_thumbnail',
+							'std'        => '0',
+							'label'      => __('Upload Your Custom Thumbnail', 'wp-event-manager'),
+							'cb_label'   => __('Allow users to upload their own custom thumbnail.', 'wp-event-manager'),
+							'desc'       => __('If enabled, users will be able to upload a custom thumbnail when submitting an event.', 'wp-event-manager'),
 							'type'       => 'checkbox',
 							'attributes' => array(),
 						),
@@ -585,21 +642,21 @@ class WP_Event_Manager_Settings{
 									echo wp_kses_post('<tr valign="top" class="' . esc_attr($class) . '"><th scope="row"><label for="setting-' . esc_attr($option['name']) . '">' . esc_attr($option['label']) . '</a></th><td>');
 									switch ($option['type']) {
 										case 'checkbox':?>
-											<label><input id="setting-<?php echo esc_attr($option['name']); ?>" name="<?php echo esc_attr($option['name']); ?>" type="checkbox" value="1" <?php echo implode(' ', $attributes); ?> <?php checked('1', $value); ?> /> <?php echo esc_attr($option['cb_label']); ?></label>
+											<label><input id="setting-<?php echo esc_attr($option['name']); ?>" name="<?php echo esc_attr($option['name']); ?>" type="checkbox" value="1" <?php echo esc_attr( implode(' ', $attributes)); ?> <?php checked('1', $value); ?> /> <?php echo esc_attr($option['cb_label']); ?></label>
 											<?php
 											if($option['desc']) {
 												echo wp_kses_post(' <p class="description">' . $option['desc'] . '</p>');
 											}
 											break;
 										case 'textarea': ?>
-											<textarea id="setting-<?php echo esc_attr($option['name']); ?>" class="large-text" cols="50" rows="<?php echo isset($option['row']) ? esc_attr($option['row']) : 3; ?>" name="<?php echo esc_attr($option['name']); ?>" <?php echo implode(' ', $attributes); ?> <?php echo esc_attr($placeholder); ?>><?php echo esc_textarea($value); ?></textarea>
+											<textarea id="setting-<?php echo esc_attr($option['name']); ?>" class="large-text" cols="50" rows="<?php echo isset($option['row']) ? esc_attr($option['row']) : 3; ?>" name="<?php echo esc_attr($option['name']); ?>" <?php echo esc_attr( implode(' ', $attributes)); ?> <?php echo esc_attr($placeholder); ?>><?php echo esc_textarea($value); ?></textarea>
 											<?php
 											if($option['desc']) {?>
 												<p class="description"><?php echo wp_kses_post($option['desc']);?></p>
 											<?php }
 											break;
 										case 'select': ?>
-											<select id="setting-<?php echo esc_attr($option['name']); ?>" class="regular-text" name="<?php echo esc_attr($option['name']); ?>" <?php echo implode(' ', $attributes); ?>>
+											<select id="setting-<?php echo esc_attr($option['name']); ?>" class="regular-text" name="<?php echo esc_attr($option['name']); ?>" <?php echo esc_attr( implode(' ', $attributes)); ?>>
 												<?php
 												foreach ($option['options'] as $key => $name) {
 													printf('<option value="' . esc_attr($key) . '" ' . selected($value, $key, false) . '>' . esc_html($name) . '</option>');
@@ -611,7 +668,7 @@ class WP_Event_Manager_Settings{
 										<?php	}
 											break;
 										case 'multiselect': ?>
-											<select id="setting-<?php echo esc_attr($option['name']); ?>" multiple="multiple" class="regular-text" name="<?php echo esc_attr($option['name']); ?>[]" <?php echo implode(' ', $attributes); ?>>
+											<select id="setting-<?php echo esc_attr($option['name']); ?>" multiple="multiple" class="regular-text" name="<?php echo esc_attr($option['name']); ?>[]" <?php echo esc_attr( implode(' ', $attributes)); ?>>
 												<?php
 												foreach ($option['options'] as $key => $name) {
 													$selected = '';
@@ -620,7 +677,7 @@ class WP_Event_Manager_Settings{
 															$selected = ' selected ';
 														}
 													}
-													printf('<option value="' . esc_attr($key) . '" ' . $selected . ' >' . esc_html($name) . '</option>');
+													printf('<option value="' . esc_attr($key) . '" ' . esc_attr($selected) . ' >' . esc_html($name) . '</option>');
 												} ?>
 											</select>
 											<?php
@@ -654,13 +711,13 @@ class WP_Event_Manager_Settings{
 												'echo'        => false,
 												'selected'    => absint($value),
 											);
-											echo str_replace(' id=', " data-placeholder='" . __('Select a page&hellip;', 'wp-event-manager') . "' id=", wp_dropdown_pages($args));
+											echo str_replace(' id=', " data-placeholder='" . esc_attr('Select a page&hellip;', 'wp-event-manager') . "' id=", wp_dropdown_pages($args));
 											if($option['desc']) {?>
 												<p class="description"><?php echo wp_kses_post($option['desc']);?></p>
 											<?php }
 											break;
 										case 'password': ?>
-											<input id="setting-<?php echo esc_attr($option['name']); ?>" class="regular-text" type="password" name="<?php echo esc_attr($option['name']); ?>" value="<?php esc_attr_e($value); ?>" <?php echo implode(' ', $attributes); ?> <?php echo esc_attr($placeholder); ?> />
+											<input id="setting-<?php echo esc_attr($option['name']); ?>" class="regular-text" type="password" name="<?php echo esc_attr($option['name']); ?>" value="<?php esc_attr($value, 'wp-event-manager'); ?>" <?php echo esc_attr(implode(' ', $attributes)); ?> <?php echo esc_attr($placeholder); ?> />
 											<?php
 											if($option['desc']) { ?>
 												<p class="description"><?php echo wp_kses_post($option['desc']);?></p>
@@ -669,28 +726,28 @@ class WP_Event_Manager_Settings{
 										case '':
 										case 'input':
 										case 'text': ?>
-											<input id="setting-<?php echo esc_attr($option['name']); ?>" class="regular-text" type="text" name="<?php echo esc_attr($option['name']); ?>" value="<?php esc_attr_e($value); ?>" <?php echo implode(' ', $attributes); ?> <?php echo $placeholder; ?> />
+											<input id="setting-<?php echo esc_attr($option['name']); ?>" class="regular-text" type="text" name="<?php echo esc_attr($option['name']); ?>" value="<?php echo esc_attr($value, 'wp-event-manager'); ?>" <?php $attributes = array_map(function($attr) { return preg_replace('/="([^"]*)"/', '=$1', $attr); }, $attributes); echo esc_attr(implode(' ', $attributes)); ?> <?php echo wp_kses_post($placeholder); ?> />
 											<?php
 											if($option['desc']) { ?>
 												<p class="description"><?php echo wp_kses_post($option['desc']);?></p>
 											<?php }
 											break;
 										case 'email': ?>
-											<input id="setting-<?php echo esc_attr($option['name']); ?>" class="regular-text" type="email" name="<?php echo esc_attr($option['name']); ?>" value="<?php esc_attr_e($value); ?>" <?php echo implode(' ', $attributes); ?> <?php echo $placeholder; ?> />
+											<input id="setting-<?php echo esc_attr($option['name']); ?>" class="regular-text" type="email" name="<?php echo esc_attr($option['name']); ?>" value="<?php esc_attr($value,'wp-event-manager'); ?>" <?php echo esc_attr(implode(' ', $attributes)); ?> <?php echo wp_kses_post($placeholder); ?> />
 											<?php
 											if($option['desc']) { ?>
 												<p class="description"><?php echo wp_kses_post($option['desc']);?></p>
 											<?php }
 											break;
 										case 'number': ?>
-											<input id="setting-<?php echo esc_attr($option['name']); ?>" class="regular-text" type="number" min="0" name="<?php echo esc_attr($option['name']); ?>" value="<?php esc_attr_e($value); ?>" <?php echo implode(' ', $attributes); ?> <?php echo esc_attr($placeholder); ?> />
+											<input id="setting-<?php echo esc_attr($option['name']); ?>" class="regular-text" type="number" min="0" name="<?php echo esc_attr($option['name']); ?>" value="<?php echo esc_attr($value, 'wp-event-manager'); ?>" <?php echo esc_attr(implode(' ', $attributes)); ?> <?php echo esc_attr($placeholder); ?> />
 											<?php
 											if($option['desc']) { ?>
 												<p class="description"><?php echo wp_kses_post($option['desc']);?></p>
 											<?php }
 											break;
 										case 'button': ?>
-											<button class="button" id="setting-<?php echo esc_attr($option['name']); ?>" class="regular-text" type="button" name="<?php echo esc_attr($option['name']); ?>" <?php echo implode(' ', $attributes); ?> <?php echo esc_attr($placeholder); ?>><?php echo esc_attr($option['cb_label']); ?></button>
+											<button class="button" id="setting-<?php echo esc_attr($option['name']); ?>" class="regular-text" type="button" name="<?php echo esc_attr($option['name']); ?>" <?php echo esc_attr(implode(' ', $attributes)); ?> <?php echo wp_kses_post($placeholder); ?>><?php echo esc_attr($option['cb_label']); ?></button>
 											<?php
 											if($option['desc']) { ?>
 												<p class="description"><?php echo wp_kses_post($option['desc']);?></p>
@@ -751,7 +808,7 @@ class WP_Event_Manager_Settings{
 								</div>
 							</div>
 						</div>
-						<span class="light-grey"><?php esc_attr_e('Powered By', 'wp-event-manager'); ?></span> <a href="https://wp-eventmanager.com/" target="_blank"><img src="<?php echo EVENT_MANAGER_PLUGIN_URL; ?>/assets/images/wpem-logo.svg" alt="WP Event Manager"></a>
+						<span class="light-grey"><?php esc_attr_e('Powered By', 'wp-event-manager'); ?></span> <a href="https://wp-eventmanager.com/" target="_blank"><img src="<?php echo esc_url(EVENT_MANAGER_PLUGIN_URL); ?>/assets/images/wpem-logo.svg" alt="WP Event Manager"></a>
 					</div>
 				</div>
 				<?php do_action('wpem_admin_seting_side_box_end'); ?>

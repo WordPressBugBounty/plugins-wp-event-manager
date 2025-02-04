@@ -41,6 +41,7 @@ class WP_Event_Manager_Ajax {
 		// EM Ajax endpoints
 		add_action('event_manager_ajax_get_listings', array($this, 'get_listings'));
 		add_action('event_manager_ajax_upload_file', array($this, 'upload_file'));
+		add_action('event_manager_ajax_load_more_upcoming_events', array($this, 'load_more_upcoming_events'));
 
 		// BW compatible handlers
 		add_action('wp_ajax_nopriv_event_manager_get_listings', array($this, 'get_listings'));
@@ -101,6 +102,65 @@ class WP_Event_Manager_Ajax {
    			die();
    		}
 	}
+
+function load_more_upcoming_events($atts) {
+    $paged = isset($_POST['value']) ? intval($_POST['value']) : 1;
+    $per_page = isset($_POST['per_page']) ? intval($_POST['per_page']) : esc_attr(get_option('event_manager_per_page'));
+
+    $args = array(
+        'post_type'      => 'event_listing',
+        'post_status'    => array('publish'),
+        'posts_per_page' => $per_page,
+        'paged'          => $paged,
+        'meta_query'     => array(
+            array(
+                'relation' => 'OR',
+                array(
+                    'key'     => '_event_start_date',
+                    'value'   => current_time('Y-m-d H:i:s'),
+                    'type'    => 'DATETIME',
+                    'compare' => '>='
+                ),
+                array(
+                    'key'     => '_event_end_date',
+                    'value'   => current_time('Y-m-d H:i:s'),
+                    'type'    => 'DATETIME',
+                    'compare' => '>='
+                )
+            ),
+            array(
+                'key'     => '_cancelled',
+                'value'   => '1',
+                'compare' => '!='
+            ),
+        )
+    );
+
+    $upcoming_events = new WP_Query($args);
+
+    if ($upcoming_events->have_posts()) {
+        ob_start();
+
+        while ($upcoming_events->have_posts()) {
+            $upcoming_events->the_post();
+            get_event_manager_template_part('content', 'past_event_listing');
+        }
+
+        $events_html = ob_get_clean();
+        $no_more_events = $upcoming_events->found_posts <= $paged * $per_page;
+
+        wp_send_json_success(array(
+            'events_html' => $events_html,
+            'no_more_events' => $no_more_events
+        ));
+    } else {
+        wp_send_json_error(array(
+            'error' => __('No more events found.', 'wp-event-manager')
+        ));
+    }
+
+    wp_reset_postdata();
+}
 
 	/**
 	 * Get listings via ajax.
@@ -165,13 +225,14 @@ class WP_Event_Manager_Ajax {
 		$fully_registered_events = 0;
 		if($events->have_posts()) : $result['found_events'] = true;
 			while ($events->have_posts()) : $events->the_post(); 
-
-			$hide_event = apply_filters('wpem_hide_selected_event', false, get_the_id());
-			if($hide_event == true){
-				continue;
-			}
-				get_event_manager_template_part( 'content', 'event_listing' );
-			endwhile;
+				
+				$hide_event = apply_filters('wpem_hide_selected_event', false, get_the_id());
+				if($hide_event == true){
+					$fully_registered_events++;
+					continue;
+				}
+				get_event_manager_template_part('content', 'event_listing');
+			endwhile; 
 			$events->found_posts -= $fully_registered_events;
 			?>
 		<?php else : 
@@ -181,7 +242,7 @@ class WP_Event_Manager_Ajax {
 					'post_status'   => 'publish'
 			));
 			if(count($default_events) == 0): ?>
-				<div class="no_event_listings_found wpem-alert wpem-alert-danger wpem-mb-0"><?php _e('There are currently no events.', 'wp-event-manager'); ?></div>
+				<div class="no_event_listings_found wpem-alert wpem-alert-danger wpem-mb-0"><?php esc_attr_e('There are currently no events.', 'wp-event-manager'); ?></div>
 			<?php else: get_event_manager_template_part('content', 'no-events-found');
 			endif;
 		endif;
@@ -249,8 +310,9 @@ class WP_Event_Manager_Ajax {
 			$result['filter_value'][] = sprintf(wp_kses('located in &ldquo;%s&rdquo;', 'wp-event-manager') , $search_location) ;
 		}
 
-		if(sizeof($result['filter_value']) > 1) {	    
-        	$message = sprintf(_n('Search completed. Found %d matching record.', 'Search completed. Found %d matching records.', $events->found_posts, 'wp-event-manager'), $events->found_posts);
+		if(sizeof($result['filter_value']) > 1) {
+			//translators: %d is the number of matching records found.
+        	$message = sprintf(esc_attr('Search completed. Found %d matching record.', 'Search completed. Found %d matching records.', $events->found_posts, 'wp-event-manager'), $events->found_posts);
 			$result['showing_applied_filters'] = true;
 		} else {
 			$message = "";
@@ -356,7 +418,7 @@ class WP_Event_Manager_Ajax {
 						'organizer_id' 	=> $organizer_id,
 						'organizer_name' => $organizer->post_title,
 					],
-					'message' => '<div class="wpem-alert wpem-alert-danger">'. __('Successfully created') . '</div>',
+					'message' => '<div class="wpem-alert wpem-alert-danger">'. __('Successfully created', 'wp-event-manager') . '</div>',
 				];
 			} else {
 				$data = [
@@ -367,7 +429,7 @@ class WP_Event_Manager_Ajax {
 		} else {
 			$data = [
 				'code' => 404,
-				'message' => '<div class="wpem-alert wpem-alert-danger">'. __('Organizer Name is a required field.') . '</div>',
+				'message' => '<div class="wpem-alert wpem-alert-danger">'. __('Organizer Name is a required field.', 'wp-event-manager') . '</div>',
 			];
 		}
 		wp_send_json($data);
@@ -416,7 +478,7 @@ class WP_Event_Manager_Ajax {
 						'venue_id' 	=> $venue_id,
 						'venue_name' => $venue->post_title,
 					],
-					'message' => '<div class="wpem-alert wpem-alert-danger">'. __('Successfully created') . '</div>',
+					'message' => '<div class="wpem-alert wpem-alert-danger">'. __('Successfully created', 'wp-event-manager') . '</div>',
 				];
 			}else{
 				$data = [
@@ -427,7 +489,7 @@ class WP_Event_Manager_Ajax {
 		} else {
 			$data = [
 				'code' => 404,
-				'message' => '<div class="wpem-alert wpem-alert-danger">'. __('Venue Name is a required field.') . '</div>',
+				'message' => '<div class="wpem-alert wpem-alert-danger">'. __('Venue Name is a required field.', 'wp-event-manager') . '</div>',
 			];
 		}
 		wp_send_json($data);

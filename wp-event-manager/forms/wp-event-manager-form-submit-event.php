@@ -446,7 +446,12 @@ class WP_Event_Manager_Form_Submit_Event extends WP_Event_Manager_Form {
 							$file_url = current( explode( '?', $file_url ) );
 							$file_info = wp_check_filetype( $file_url );
 							if( !is_numeric( $file_url ) && $file_info && ! in_array( $file_info['type'], $field['allowed_mime_types'] ) ) {
-								throw new Exception( sprintf(wp_kses( '"%s" (filetype %s) needs to be one of the following file types: %s', 'wp-event-manager' ), esc_attr( $field['label'] ), esc_attr( $info['ext'] ), implode( ', ', array_keys( $field['allowed_mime_types'] ) ) ) );
+								throw new Exception(sprintf(
+								wp_kses('" %s " (filetype %s) needs to be one of the following file types: %s', 'wp-event-manager'),
+								esc_attr($field['label']),
+								esc_attr($info['ext']),
+								implode(', ', array_map('esc_attr', array_keys($field['allowed_mime_types'])))
+							));
 							}
 						}
 					}
@@ -479,7 +484,7 @@ class WP_Event_Manager_Form_Submit_Event extends WP_Event_Manager_Form {
 			switch ( $allowed_registration_method ) {
 				case 'email' :
 					if( !is_email( $values['event']['registration'] ) ) {
-						throw new Exception( __( 'Please enter a valid registration email address.', 'wp-event-manager' ) );
+						throw new Exception( esc_attr_e( 'Please enter a valid registration email address.', 'wp-event-manager' ) );
 					}
 				break;
 				case 'url' :
@@ -488,7 +493,7 @@ class WP_Event_Manager_Form_Submit_Event extends WP_Event_Manager_Form {
 						$values['event']['registration'] = 'http://' . $values['event']['registration'];
 					}
 					if( !filter_var( $values['event']['registration'], FILTER_VALIDATE_URL ) ) {
-						throw new Exception( __( 'Please enter a valid registration URL.', 'wp-event-manager' ) );
+						throw new Exception( esc_attr_e( 'Please enter a valid registration URL.', 'wp-event-manager' ) );
 					}
 				break;
 				default :
@@ -498,7 +503,7 @@ class WP_Event_Manager_Form_Submit_Event extends WP_Event_Manager_Form {
 							$values['event']['registration'] = 'http://' . $values['event']['registration'];
 						}
 						if( !filter_var( $values['event']['registration'], FILTER_VALIDATE_URL ) ) {
-							throw new Exception( __( 'Please enter a valid registration email address or URL.', 'wp-event-manager' ) );
+							throw new Exception( esc_attr_e( 'Please enter a valid registration email address or URL.', 'wp-event-manager' ) );
 						}
 					}
 				break;
@@ -864,6 +869,9 @@ class WP_Event_Manager_Form_Submit_Event extends WP_Event_Manager_Form {
 						wp_set_object_terms( $this->event_id, array( $values[ $group_key ][ $key ] ), $field['taxonomy'], false );
 					}				
 				// Oragnizer logo is a featured image
+				}elseif( 'event_thumbnail' === $key ) {
+					$attachment_id = is_numeric( $values[ $group_key ][ $key ] ) ? absint( $values[ $group_key ][ $key ] ) : $this->create_attachment( $values[ $group_key ][ $key ] );
+					set_post_thumbnail( $this->event_id, $attachment_id );
 				}
 				elseif ( 'organizer_logo' === $key ) {
 					$attachment_id = is_numeric( $values[ $group_key ][ $key ] ) ? absint( $values[ $group_key ][ $key ] ) : $this->create_attachment( $values[ $group_key ][ $key ] );
@@ -1051,9 +1059,9 @@ class WP_Event_Manager_Form_Submit_Event extends WP_Event_Manager_Form {
 					/*
 					* set first image of banner as a thumbnail
 					*/
-					if($key == 0){
+					/*if($key == 0){
 						set_post_thumbnail($this->event_id, $attachment_id);
-					}
+					}*/
 				}
 			}
 		}

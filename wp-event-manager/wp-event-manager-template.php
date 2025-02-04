@@ -408,7 +408,11 @@ function display_event_publish_date($post = null){
 	} else {
 		$display_date = sprintf(wp_kses('Posted %s ago', 'wp-event-manager'), human_time_diff(get_post_time('U'), current_time('timestamp')));
 	}
-	printf('<time datetime="' . get_post_time('Y-m-d') . '">' . esc_html($display_date) . '</time>');
+	printf(
+		'<time datetime="%s">%s</time>',
+		esc_attr(get_post_time('Y-m-d')),  // Escape the date output from get_post_time
+		esc_html($display_date)  // Escape the display date for safe HTML output
+	);
 }
 
 /**
@@ -454,7 +458,7 @@ function display_event_location($map_link = true, $post = null){
 	if(is_event_online($post)) {
 		echo wp_kses_post(apply_filters('display_event_location_anywhere_text', __('Online Event', 'wp-event-manager')));
 	} else {
-		if($map_link && $map_link!='-')
+		if($map_link === true || ($map_link && $map_link !== '-'))
 			echo wp_kses_post(apply_filters('display_event_location_map_link', '<a  href="http://maps.google.com/maps?q=' . urlencode($location) . '&zoom=14&size=512x512&maptype=roadmap&sensor=false" target="_blank">' . $location . '</a>', $location, $post));
 		else
 			echo wp_kses_post($location);
@@ -581,26 +585,44 @@ function get_event_banner($post = null){
  * @param mixed $post (default: null)
  * @return string
  */
-function get_event_thumbnail($post = null, $size = 'full'){
+function get_event_thumbnail($post = null, $size = 'full') {
+    $post = get_post($post);
+    
+    if($post->post_type !== 'event_listing') {
+        return;
+    }
 
-	$post = get_post($post);
-	if($post->post_type !== 'event_listing')
-		return;
+    $use_custom_thumbnail = get_option('event_manager_use_custom_thumbnail');
 
-	$event_thumbnail = get_the_post_thumbnail_url($post, $size);
-	// If thumbnail is not set then check for banner
-	if(isset($event_thumbnail) && empty($event_thumbnail)){
-		if(isset($post->_event_banner) && empty($post->_event_banner)){
-			$event_thumbnail = apply_filters('event_manager_default_event_banner', EVENT_MANAGER_PLUGIN_URL . '/assets/images/wpem-placeholder-wide.jpg');
-		}else{
-			$event_banner = $post->_event_banner;
-			if(is_array($event_banner))
-				$event_thumbnail = $event_banner[0];
-			else
-				$event_thumbnail = $event_banner;
-		}
-	}
-	return apply_filters('display_event_thumbnail', $event_thumbnail, $post);
+    if ($use_custom_thumbnail) {
+        $event_thumbnail = get_the_post_thumbnail_url($post, $size);
+        
+        // If no thumbnail is set, show the default placeholder
+        if (empty($event_thumbnail)) {
+            $event_thumbnail = apply_filters('event_manager_default_event_thumbnail', EVENT_MANAGER_PLUGIN_URL . '/assets/images/wpem-placeholder-wide.jpg');
+        }
+    } else {
+        
+        $event_thumbnail = get_the_post_thumbnail_url($post, $size);
+        
+        // If no thumbnail is set, check for the banner
+        if (empty($event_thumbnail)) {
+            if (!empty($post->_event_banner)) {
+                // If event banner is set, use it
+                $event_banner = $post->_event_banner;
+                if (is_array($event_banner)) {
+                    $event_thumbnail = $event_banner[0];
+                } else {
+                    $event_thumbnail = $event_banner;
+                }
+            } else {
+                // If no banner is set, show the default placeholder
+                $event_thumbnail = apply_filters('event_manager_default_event_banner', EVENT_MANAGER_PLUGIN_URL . '/assets/images/wpem-placeholder-wide.jpg');
+            }
+        }
+    }
+	
+    return apply_filters('display_event_thumbnail', $event_thumbnail, $post);
 }
 
 /**
@@ -621,14 +643,14 @@ function display_event_banner($size = 'full', $default = null, $post = null){
 			$banner = event_manager_get_resized_image($banner, $size);
 		}
 		printf('<link rel="image_src" href="' . esc_attr($banner) . '"/>');
-		printf('<img itemprop="image" content="' . esc_attr($banner) . '" src="' . esc_attr($banner) . '" alt="' . $alt_text . '" />');
+		printf('<img itemprop="image" content="' . esc_attr($banner) . '" src="' . esc_attr($banner) . '" alt="' . esc_attr($alt_text) . '" />');
 	} else if($default) {
 
-		printf('<img itemprop="image" content="' . esc_attr($default) . '" src="' . esc_attr($default) . '" alt="' . $alt_text . '" />');
+		printf('<img itemprop="image" content="' . esc_attr($default) . '" src="' . esc_attr($default) . '" alt="' . esc_attr($alt_text) . '" />');
 	} else if(is_array($banner) && isset($banner[0])) {
-		printf('<img itemprop="image" content="' . esc_attr($banner[0]) . '" src="' . esc_attr($banner[0]) . '" alt="' . $alt_text . '" />');
+		printf('<img itemprop="image" content="' . esc_attr($banner[0]) . '" src="' . esc_attr($banner[0]) . '" alt="' . esc_attr($alt_text) . '" />');
 	} else {
-		printf('<img itemprop="image" content="' . esc_attr(apply_filters('event_manager_default_event_banner', EVENT_MANAGER_PLUGIN_URL . '/assets/images/wpem-placeholder.jpg')) . '" src="' . esc_attr(apply_filters('event_manager_default_event_banner', EVENT_MANAGER_PLUGIN_URL . '/assets/images/wpem-placeholder.jpg')) . '" alt="' . $alt_text . '" />');
+		printf('<img itemprop="image" content="' . esc_attr(apply_filters('event_manager_default_event_banner', EVENT_MANAGER_PLUGIN_URL . '/assets/images/wpem-placeholder.jpg')) . '" src="' . esc_attr(apply_filters('event_manager_default_event_banner', EVENT_MANAGER_PLUGIN_URL . '/assets/images/wpem-placeholder.jpg')) . '" alt="' . esc_attr($alt_text) . '" />');
 	}
 }
 
@@ -2076,8 +2098,8 @@ function display_organizer_google_plus($before = '', $after = '', $echo = true, 
  * @return void
  */
 function event_listing_class($class = '', $post_id = null){
-	// Separates classes with a single space, collates classes for post DIV
-	echo 'class="' . join(' ', get_event_listing_class($class, $post_id)) . '"';
+    $classes = get_event_listing_class($class, $post_id);
+    echo 'class="' . esc_attr(join(' ', $classes)) . '"';
 }
 
 /**
@@ -2493,8 +2515,12 @@ function get_wpem_date_time_separator(){
  * @return
  **/
 function display_date_time_separator(){
-	$separator = get_wpem_date_time_separator();
-	printf(' '.__('%s', 'wp-event-manager').' ', $separator);
+	$separator = get_option('event_manager_date_time_format_separator', '@');
+	if($separator){
+		return	apply_filters('event_manager_date_time_format_separator', get_option('event_manager_date_time_format_separator', '@'));
+	}else {
+		echo ' @ ';
+	}
 }
 
 /**
@@ -2578,7 +2604,7 @@ function display_wpem_get_query_pagination($max_num_pages = 0, $current_page = 1
 		</ul>
 	</nav>
 <?php
-	echo ob_get_clean();
+	 ob_get_clean();
 }
 
 /**

@@ -272,6 +272,7 @@ class WP_Event_Manager_Post_Types {
 			'exclude_from_search'       => true,
 			'show_in_admin_all_list'    => true,
 			'show_in_admin_status_list' => true,
+			// translators: %s is the count of expired posts.
 			'label_count'               => _n_noop('Expired <span class="count">(%s)</span>', 'Expired <span class="count">(%s)</span>', 'wp-event-manager')
 		));
 
@@ -280,6 +281,7 @@ class WP_Event_Manager_Post_Types {
 			'exclude_from_search'       => true,
 			'show_in_admin_all_list'    => true,
 			'show_in_admin_status_list' => true,
+			// translators: %s is the count of preview posts.
 			'label_count'               => _n_noop('Preview <span class="count">(%s)</span>', 'Preview <span class="count">(%s)</span>', 'wp-event-manager')
 		));
 
@@ -629,7 +631,7 @@ class WP_Event_Manager_Post_Types {
 	 * Add a custom namespace to the event feed.
 	 */
 	public function event_feed_namespace() {
-		echo 'xmlns:event_listing="' .  site_url() . '"' . "\n";
+		echo 'xmlns:event_listing="' . esc_url(site_url()) . '"' . "\n";
 	}
 
 	/**

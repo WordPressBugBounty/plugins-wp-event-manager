@@ -7,7 +7,7 @@
 * Author URI: https://www.wp-eventmanager.com
 * Text Domain: wp-event-manager
 * Domain Path: /languages
-* Version: 3.1.45.1
+* Version: 3.1.46
 * Since: 1.0.0
 * Requires WordPress Version at least: 5.4.1
 * Copyright: 2019 WP Event Manager
@@ -43,7 +43,7 @@ class WP_Event_Manager {
 	 * @var plugin version
 	 * @since  3.1.33
 	 */
-	private static $wpem_verion = '3.1.45.1';
+	private static $wpem_verion = '3.1.46';
 
 
 	/**
@@ -109,7 +109,18 @@ class WP_Event_Manager {
 
 		// Activation hooks provide ways to perform actions when plugins are activated.
 		register_activation_hook(basename(dirname(__FILE__)) . '/' . basename(__FILE__), array($this, 'activate'));
+		
+		// Hide dashboard pages from non organizer user
+		add_action('event_manager_organizer_dashboard_before', array($this, 'wpem_restrict_non_organizer_access_to_dashboard'));
+		add_action('event_manager_venue_dashboard_before',array($this, 'wpem_restrict_non_organizer_access_to_dashboard'));
+		add_action('event_manager_event_dashboard_before',array($this, 'wpem_restrict_non_organizer_access_to_dashboard'));
+		
+		// Restrict to add venue, organizer, event form for non organizer user.
+		add_action('wp_event_manager_venue_submit_before', array($this, 'wpem_restrict_non_organizer_access_to_dashboard'));
+		add_action('wp_event_manager_organizer_submit_before', array($this, 'wpem_restrict_non_organizer_access_to_dashboard'));
+		add_action('wp_event_manager_event_submit_before', array($this, 'wpem_restrict_non_organizer_access_to_dashboard'));
 
+		
 		// Switch theme
 		add_action('after_switch_theme', array('WP_Event_Manager_Ajax', 'add_endpoint'), 10);
 		add_action('after_switch_theme', array($this->post_types, 'register_post_types'), 11);
@@ -416,7 +427,29 @@ class WP_Event_Manager {
 		if(!wp_next_scheduled('event_manager_clear_expired_transients')) {
 			wp_schedule_event(time(), 'twicedaily', 'event_manager_clear_expired_transients');
 		}
-	}			
+	}
+	/**
+	 * Restrict access to the dashboard for non-organizer and non-administrator users.
+	 *
+	 * This function checks if the current user has the 'organizer' or 'administrator' role.
+	 * If the user lacks both capabilities, an informational message is displayed,
+	 * and further access to the dashboard is restricted.
+	 *
+	 * @return void
+	 */
+	public function wpem_restrict_non_organizer_access_to_dashboard() {
+		if ( is_user_logged_in() ) {
+			if (!current_user_can('organizer') && !current_user_can('administrator')) {
+				?>
+				<p class="account-sign-in wpem-alert wpem-alert-info">
+				<?php 
+				esc_html_e('You do not have permission to manage this dashboard.', 'wp-event-manager'); ?> 
+				</p>
+				<?php
+				exit; 
+			}
+		}
+	}
 }
 
 /**

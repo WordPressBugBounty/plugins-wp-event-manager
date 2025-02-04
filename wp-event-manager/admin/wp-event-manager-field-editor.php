@@ -44,7 +44,7 @@ class WP_Event_Manager_Field_Editor {
 		wp_enqueue_style('chosen', EVENT_MANAGER_PLUGIN_URL . '/assets/css/chosen.min.css');
 		wp_enqueue_script('wp-event-manager-form-field-editor'); ?>
 		<div class="wrap wp-event-manager-registrations-form-editor">
-			<h1 class="wp-heading-inline"><?php esc_attr_e('Form fields'); ?></h1>
+			<h1 class="wp-heading-inline"><?php esc_attr_e( 'Form fields', 'wp-event-manager' ); ?></h1>
 			<div class="wpem-wrap wp-event-manager-form-field-editor">
 				<form method="post" id="mainform" action="<?php echo esc_url("edit.php?post_type=event_listing&amp;page=event-manager-form-editor");?>">
 					<?php $this->form_editor(); ?>
@@ -137,7 +137,12 @@ class WP_Event_Manager_Field_Editor {
 			} ?>
 
 			<div class="wp-event-manager-event-form-field-editor">
-				<h3><?php printf(esc_attr__('%s form fields', 'wp-event-manager'), ucfirst(esc_attr($group_key))); ?></h3>
+				<h3>
+				<?php 
+					// translators: %s refers to the group key used in the form fields title.
+					printf(esc_html('%s form fields', 'wp-event-manager'),esc_html(ucfirst($group_key))); 
+				?>
+				</h3>
 				<table class="widefat">
 					<thead>
 						<tr>
@@ -160,8 +165,10 @@ class WP_Event_Manager_Field_Editor {
 							</th>
 
 							<th colspan="6" class="save-actions">
-								<a href="<?php echo wp_nonce_url(add_query_arg($group_key . '-reset-fields', 1), 'reset'); ?>" class="reset"><?php esc_attr_e('Reset to default', 'wp-event-manager'); ?></a>
-								<input type="submit" class="save-fields button-primary" value="<?php esc_attr_e('Save Changes', 'wp-event-manager'); ?>" />
+							<a href="<?php echo esc_url(wp_nonce_url(add_query_arg($group_key . '-reset-fields', 1), 'reset')); ?>" class="reset">
+									<?php esc_html_e('Reset to default', 'wp-event-manager'); ?>
+							</a>
+							<input type="submit" class="save-fields button-primary" value="<?php esc_attr_e('Save Changes', 'wp-event-manager'); ?>" />
 							</th>
 
 						</tr>

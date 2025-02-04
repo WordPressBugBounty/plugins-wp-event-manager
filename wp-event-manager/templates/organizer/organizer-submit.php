@@ -4,7 +4,9 @@
  */
 if (!defined('ABSPATH'))
     exit;
-global $event_manager; ?>
+global $event_manager; 
+do_action('wp_event_manager_organizer_submit_before');
+?>
 
 <form action="<?php echo esc_url($action); ?>" method="post" id="submit-organizer-form" class="wpem-form-wrapper wpem-main event-manager-form" enctype="multipart/form-data">
     <?php  if (is_user_logged_in()) {
@@ -20,7 +22,8 @@ global $event_manager; ?>
 
         <h2 class="wpem-form-title wpem-heading-text"><?php esc_html_e('Organizer Details', 'wp-event-manager'); ?></h2>
         <?php if (isset($resume_edit) && $resume_edit) {
-            printf('<p class="wpem-alert wpem-alert-info"><strong>' . __("You are editing an existing organizer. %s", "wp-event-manager") . '</strong></p>', '<a href="?new=1&key=%s">' . __('Create A New organizer', 'wp-event-manager') . '</a>',esc_attr($resume_edit));
+			// Translators: %s is a link to create a new organizer
+            printf('<p class="wpem-alert wpem-alert-info"><strong>' . esc_attr("You are editing an existing organizer. %s", "wp-event-manager") . '</strong></p>', '<a href="?new=1&key=%s">' . esc_attr('Create A New organizer', 'wp-event-manager') . '</a>',esc_attr($resume_edit));
         }        
         do_action('submit_organizer_form_organizer_fields_start'); 
         foreach ($organizer_fields as $key => $field) : 
@@ -28,7 +31,7 @@ global $event_manager; ?>
                 continue;
             endif;?>
             <fieldset class="wpem-form-group fieldset-<?php echo esc_attr($key); ?>">
-                <label for="<?php esc_attr_e($key); ?>"><?php _e(esc_attr($field['label']), 'wp-event-manager'); echo apply_filters('submit_event_form_required_label', $field['required'] ? '<span class="require-field">*</span>' : ' <small>' . __('(optional)', 'wp-event-manager') . '</small>', $field); ?></label>
+                <label for="<?php esc_attr($key, 'wp-event-manager'); ?>"><?php esc_html_e($field['label'], 'wp-event-manager'); echo wp_kses_post(apply_filters('submit_event_form_required_label', $field['required'] ? '<span class="require-field">*</span>' : ' <small>' . __('(optional)', 'wp-event-manager') . '</small>', $field)); ?></label>
                 <div class="field <?php echo esc_attr($field['required'] ? 'required-field' : ''); ?>">
                     <?php get_event_manager_template('form-fields/' . $field['type'] . '-field.php', array('key' => $key, 'field' => $field)); ?>
                 </div>
@@ -40,7 +43,7 @@ global $event_manager; ?>
             <input type="hidden" name="event_manager_form" value="<?php echo esc_attr($form); ?>" />
             <input type="hidden" name="organizer_id" value="<?php echo esc_attr($organizer_id); ?>" />
             <input type="hidden" name="step" value="<?php echo esc_attr($step); ?>" />
-            <input type="submit" name="submit_organizer" id="submit-organizer-button" class="wpem-theme-button" value="<?php esc_attr_e($submit_button_text); ?>" />
+            <input type="submit" name="submit_organizer" id="submit-organizer-button" class="wpem-theme-button" value="<?php echo esc_attr($submit_button_text, 'wp-event-manager'); ?>" />
         </div>
     <?php } else {   ?>
         <div class="wpem-form-group">

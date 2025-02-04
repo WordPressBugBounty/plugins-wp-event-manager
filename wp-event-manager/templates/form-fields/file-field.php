@@ -27,6 +27,7 @@ if (!empty($field['ajax']) && event_manager_user_can_upload_file_via_ajax()) {
 	<?php if (!empty($field['description'])) { 
 		echo esc_attr($field['description']);
 	} else { 
-		printf(__('Maximum file size: %s.', 'wp-event-manager'), size_format(wp_max_upload_size()));
+		// translators: %s is the maximum file size allowed for uploads.
+		printf(esc_attr('Maximum file size: %s.', 'wp-event-manager'), esc_attr(size_format(wp_max_upload_size())));
 	} ?>
 </small>
