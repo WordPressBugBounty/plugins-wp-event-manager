@@ -1,10 +1,12 @@
 <?php
+if ( ! defined( 'ABSPATH' ) ) {
+    exit; // Exit if accessed directly
+}
 /**
  * The template for displaying archive.
  */
 
 get_header();
-
 global $wp_query; ?>
 
 <div class="wpem-container">
@@ -18,15 +20,15 @@ global $wp_query; ?>
                 </div>
                 <?php
                 // remove calender view
-                remove_action('end_event_listing_layout_icon', 'add_event_listing_calendar_layout_icon'); ?>
+                remove_action('wpem_end_event_listing_layout_icon', 'add_event_listing_calendar_layout_icon'); ?>
                 <div class="event_listings">
                     <?php if (have_posts()) : 
-                        get_event_manager_template('event-listings-start.php' ,array('layout_type'=>'all')); 
+                        wpem_get_event_manager_template('event-listings-start.php' ,array('layout_type'=>'all')); 
                         while (have_posts()) : the_post(); 
-                            get_event_manager_template_part('content', 'event_listing'); 
+                            wpem_get_event_manager_template_part('content', 'event_listing'); 
                         endwhile; 
-                        get_event_manager_template('event-listings-end.php');
-                        get_event_manager_template('pagination.php', array('max_num_pages' => $wp_query->max_num_pages)); ?>
+                        wpem_get_event_manager_template('event-listings-end.php');
+                        wpem_get_event_manager_template('pagination.php', array('max_num_pages' => $wp_query->max_num_pages)); ?>
                     <?php else :
                         do_action('event_manager_output_events_no_results');
                     endif;

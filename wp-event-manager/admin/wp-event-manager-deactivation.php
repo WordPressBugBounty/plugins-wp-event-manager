@@ -1,13 +1,12 @@
 <?php
-/*
-* This file use to create fields of wp event manager at admin side.
-*/
 if(!defined('ABSPATH')) {
 	exit; // Exit if accessed directly
 }
 
 /**
  *  Class with details of plugin deactivation.
+ * This file use to create fields of wp event manager at admin side.
+ * 
  */
 class WP_Event_Manager_Deactivation {
 
@@ -21,7 +20,7 @@ class WP_Event_Manager_Deactivation {
 			if ( ! $this->is_plugins_screen() ) {
 				return;
 			}
-
+		    add_action( 'admin_footer', [ $this, 'wpem_deactivate_feedback_dialog' ] );
 			add_action( 'admin_enqueue_scripts', [ $this, 'wpem_enqueue_deactivation_script' ] );
 		} );
         
@@ -34,14 +33,13 @@ class WP_Event_Manager_Deactivation {
 	 * @since 3.1.46
 	 */
 	public function wpem_enqueue_deactivation_script() {
-		add_action( 'admin_footer', [ $this, 'wpem_deactivate_feedback_dialog' ] );
 
 		wp_enqueue_script('wpem-deactivation-js', EVENT_MANAGER_PLUGIN_URL . '/assets/js/wpem-deactivation.min.js', ['jquery'], '1.0', true);
         wp_localize_script('wpem-deactivation-js', 'wpem_ajax', [
             'ajax_url' => admin_url('admin-ajax.php'),
             'nonce'    => wp_create_nonce('wpem_deactivation_nonce'),
         ]);
-        wp_enqueue_style('wpem-deactivation-css', EVENT_MANAGER_PLUGIN_URL . '/assets/css/wpem-deactivation.min.css');
+        wp_enqueue_style('wpem-deactivation-css', EVENT_MANAGER_PLUGIN_URL . '/assets/css/wpem-deactivation.min.css', array(), '1.0.0', true);
 	}
 
     /**
@@ -97,11 +95,11 @@ class WP_Event_Manager_Deactivation {
 	 */
     public function wpem_get_user_ip() {
         if (!empty($_SERVER['HTTP_CLIENT_IP'])) {
-            $ip = $_SERVER['HTTP_CLIENT_IP'];
+            $ip = wp_kses_post(wp_unslash($_SERVER['HTTP_CLIENT_IP']));
         } elseif (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
-            $ip = $_SERVER['HTTP_X_FORWARDED_FOR'];
+            $ip = wp_kses_post(wp_unslash($_SERVER['HTTP_X_FORWARDED_FOR']));
         } else {
-            $ip = $_SERVER['REMOTE_ADDR'];
+            $ip = isset($_SERVER['REMOTE_ADDR']) ? wp_kses_post(wp_unslash($_SERVER['REMOTE_ADDR'])) : '';
         }
         return $ip;
     }
@@ -111,17 +109,32 @@ class WP_Event_Manager_Deactivation {
 	 *@since 3.1.46
 	 */
     function wpem_get_location_by_ip($ip) {
-        $url = "http://ip-api.com/json/{$ip}";
-        $response = @file_get_contents($url);
-        if ($response) {
-            $data = json_decode($response, true);
-            if ($data['status'] === 'success') {
-                return [
-                    'city' => $data['city'],
-                    'country' => $data['country']
-                ];
-            }
+        $url = "https://ip-api.com/json/{$ip}";
+
+        $response = wp_remote_get( $url, array(
+            'timeout' => 10,
+            'redirection' => 5,
+        ) );
+
+        // Error handling
+        if ( is_wp_error( $response ) ) {
+            return null;
         }
+
+        $body = wp_remote_retrieve_body( $response );
+        if ( empty( $body ) ) {
+            return null;
+        }
+
+        $data = json_decode( $body, true );
+
+        if ( isset( $data['status'] ) && $data['status'] === 'success' ) {
+            return [
+                'city'    => $data['city'] ?? '',
+                'country' => $data['country'] ?? '',
+            ];
+        }
+
         return null;
     }
 
@@ -134,7 +147,7 @@ class WP_Event_Manager_Deactivation {
 
         if (isset($_POST['reason'])) {
             $reason = sanitize_text_field(wp_unslash($_POST['reason']));
-            $additional_feedback = sanitize_text_field(wp_unslash($_POST['additional_feedback']));
+            $additional_feedback = isset($_POST['additional_feedback']) ? sanitize_text_field(wp_unslash($_POST['additional_feedback'])) : '';
 
             $current_user = wp_get_current_user();
             $user_first_name = get_user_meta($current_user->ID, 'first_name', true);
@@ -147,7 +160,7 @@ class WP_Event_Manager_Deactivation {
                 $reason = 'Other (' . $additional_feedback . ')';
             }		
 
-            $api_url = 'https://wp-eventmanager.com/?wc-api=wpem_plugin_deactivation_review';
+            $api_url = esc_url(get_option('wp_event_manager_store_url').'?wc-api=wpem_plugin_deactivation_review');
             $data = array(
                 'request' => 'deactivationreview',
                 'email' => get_option('admin_email'),

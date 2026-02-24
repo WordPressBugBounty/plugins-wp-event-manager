@@ -1,15 +1,18 @@
 <?php
+if ( ! defined( 'ABSPATH' ) ) {
+    exit; // Exit if accessed directly
+}
 include_once('wp-event-manager-form-submit-venue.php');
 
 /**
- * WP_Event_Manager_Form_Edit_Venue class.
+ * WPEM_Event_Manager_Form_Edit_Venue class.
  */
-class WP_Event_Manager_Form_Edit_Venue extends WP_Event_Manager_Form_Submit_Venue {
+class WPEM_Event_Manager_Form_Edit_Venue extends WPEM_Event_Manager_Form_Submit_Venue {
 
 	public $form_name           = 'edit-venue';
 	public $venue_id;
 	
-	/** @var WP_Event_Manager_Form_Edit_Venue The single instance of the class */
+	/** @var WPEM_Event_Manager_Form_Edit_Venue The single instance of the class */
 
 	protected static $_instance = null;
 
@@ -27,8 +30,17 @@ class WP_Event_Manager_Form_Edit_Venue extends WP_Event_Manager_Form_Submit_Venu
 	 * Constructor.
 	*/
 	public function __construct() {
-		$this->venue_id = !empty($_REQUEST['venue_id']) ? absint($_REQUEST[ 'venue_id' ]) : 0;
-		if  (!event_manager_user_can_edit_event($this->venue_id)) {
+		// IMPORTANT: call parent constructor
+		parent::__construct();
+
+		// Override form name
+		$this->form_name = 'edit-venue';
+
+		// Get venue ID
+		$this->venue_id = ! empty($_REQUEST['venue_id']) ? absint(wp_unslash($_REQUEST['venue_id'])) : 0;
+
+		// Permission check
+		if (!event_manager_user_can_edit_venue($this->venue_id)) {
 			$this->venue_id = 0;
 		}
 	}
@@ -55,7 +67,7 @@ class WP_Event_Manager_Form_Edit_Venue extends WP_Event_Manager_Form_Submit_Venu
 		// $this->init_fields(); We dont need to initialize with this function because of field edior
 		// Now field editor function will return all the fields 
 		// Get merged fields from db and default fields.
-		$this->merge_with_custom_fields('frontend');
+		$this->wpem_merge_with_custom_fields('frontend');
 		
 		// Get date and time setting defined in admin panel Event listing -> Settings -> Date & Time formatting
 		$datepicker_date_format 	= WP_Event_Manager_Date_Time::get_datepicker_format();
@@ -82,14 +94,14 @@ class WP_Event_Manager_Form_Edit_Venue extends WP_Event_Manager_Form_Submit_Venu
 				}
 				if(!empty($field['type']) &&  $field['type'] == 'date'){
 					$venue_date = esc_html(get_post_meta($venue->ID, '_' . $key, true));
-					$this->fields[ $group_key ][ $key ]['value'] = !empty($venue_date) ? date($php_date_format ,strtotime($venue_date)) :'';
+					$this->fields[ $group_key ][ $key ]['value'] = !empty($venue_date) ? gmdate($php_date_format ,strtotime($venue_date)) :'';
 				}
 			}
 		}
 		$this->fields = apply_filters('submit_venue_form_fields_get_venue_data', $this->fields, $venue);
 		wp_enqueue_script('wp-event-manager-event-submission');
 
-		get_event_manager_template('venue-submit.php', 
+		wpem_get_event_manager_template('venue-submit.php', 
 			array(
 				'form'              => esc_attr($this->form_name),
 				'venue_id'          => esc_attr($this->get_venue_id()),
@@ -107,10 +119,15 @@ class WP_Event_Manager_Form_Edit_Venue extends WP_Event_Manager_Form_Submit_Venu
 	 * Submit Step is posted.
 	 */
 	public function submit_handler() {
-
 		if(empty($_POST['submit_venue'])) {
 			return;
 		}
+		
+		// Verify nonce before processing form data
+		if (empty($_POST['_wpnonce']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['_wpnonce'])), 'edit-venue_' . $this->venue_id)) {
+			wp_die(esc_html__('Security check failed. Please try again.', 'wp-event-manager'));
+		}
+		
 		try {
 			// Get posted values
 			$values = $this->get_posted_fields();
@@ -127,14 +144,22 @@ class WP_Event_Manager_Form_Edit_Venue extends WP_Event_Manager_Form_Submit_Venu
 			$this->save_venue($venue_name, $venue_description, '', $values, false);
 
 			$this->update_venue_data($values);
-			// Successful
-			switch (get_post_status($this->venue_id)) {
-				case 'publish' :
-					echo wp_kses_post('<div class="event-manager-message wpem-alert wpem-alert-success">' . __('Your changes have been saved.', 'wp-event-manager') . ' <a href="' . get_permalink($this->venue_id) . '">' . __('View &rarr;', 'wp-event-manager') . '</a>' . '</div>');
-					break;
-				default :
-					echo wp_kses_post('<div class="event-manager-message wpem-alert wpem-alert-success">' . __('Your changes have been saved.', 'wp-event-manager') . '</div>');
-					break;
+
+			// Clear any previous messages to avoid duplicates
+			if (!empty($this->errors)) {
+				$this->errors = array();
+			}
+			
+			// Add success message
+			// $this->add_message(__('Your changes have been saved.', 'wp-event-manager'));
+			
+			// Redirect to prevent form resubmission
+			$redirect_url = remove_query_arg('updated', $this->get_action());
+			$redirect_url = add_query_arg('updated', 'true', $redirect_url);
+			
+			if (!headers_sent()) {
+				wp_safe_redirect($redirect_url);
+				exit;
 			}
 		} catch (Exception $e) {
 			echo wp_kses_post('<div class="event-manager-error wpem-alert wpem-alert-danger">' .  esc_html($e->getMessage()) . '</div>');

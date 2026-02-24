@@ -1,13 +1,12 @@
 <?php
-/*
-* Admin UI for creating custom post types(CPT) and custom taxonomies in WordPress.
-*/
 if(!defined('ABSPATH')) {
 	exit; // Exit if accessed directly
 }
 
 /**
  * Class of WP Event Manager custom post types.
+ * Admin UI for creating custom post types(CPT) and custom taxonomies in WordPress.
+ * 
  */
 class WP_Event_Manager_CPT {
 
@@ -99,7 +98,13 @@ class WP_Event_Manager_CPT {
 						}
 					}
 				}
-				wp_redirect(add_query_arg('approved_events', count($approved_events), $redirect_url));
+				wp_safe_redirect(
+					add_query_arg(
+						'approved_events',
+						count( $approved_events ),
+						$redirect_url
+					)
+				);
 				exit;
 				break;
 			case 'expire_events':
@@ -116,7 +121,13 @@ class WP_Event_Manager_CPT {
 						}
 					}
 				}
-				wp_redirect(add_query_arg('expire_events', count($expired_events), $redirect_url));
+				wp_safe_redirect(
+					add_query_arg(
+						'expire_events',
+						count( $expired_events ),
+						$redirect_url
+					)
+				);
 				exit;
 				break;
 		}
@@ -127,7 +138,7 @@ class WP_Event_Manager_CPT {
 	 * Approve a single event.
 	 */
 	public function approve_event()	{
-		if(!empty($_GET['approve_event']) && wp_verify_nonce(sanitize_key($_REQUEST['_wpnonce']), 'approve_event') && current_user_can('publish_post',esc_attr( wp_unslash( $_GET['approve_event'] )))) {
+		if( isset($_REQUEST['_wpnonce']) && !empty($_GET['approve_event']) && wp_verify_nonce(sanitize_text_field(wp_unslash($_REQUEST['_wpnonce'])), 'approve_event') && current_user_can('publish_post',sanitize_text_field( wp_unslash( $_GET['approve_event'] )))) {
 			$post_id = absint($_GET['approve_event']);
 			$event_end_date    = esc_attr(get_post_meta($post_id, '_event_end_date', true));
 			$current_timestamp = strtotime(current_time('Y-m-d H:i:s'));
@@ -143,7 +154,16 @@ class WP_Event_Manager_CPT {
 				);
 			}
 			wp_update_post($event_data);
-			wp_redirect(remove_query_arg('approve_event', add_query_arg('approved_events', $post_id, admin_url('edit.php?post_type=event_listing'))));
+			wp_safe_redirect(
+				remove_query_arg(
+					'approve_event',
+					add_query_arg(
+						'approved_events',
+						$post_id,
+						admin_url( 'edit.php?post_type=event_listing' )
+					)
+				)
+			);
 			exit;
 		}
 	}
@@ -153,8 +173,8 @@ class WP_Event_Manager_CPT {
 	 */
 	public function approved_notice() {
 		global $post_type, $pagenow;
-		if($pagenow == 'edit.php' && $post_type == 'event_listing' && !empty($_REQUEST['approved_events'])) {
-			$approved_events = esc_attr($_REQUEST['approved_events']);
+		if($pagenow == 'edit.php' && $post_type == 'event_listing' && !empty($_REQUEST['approved_events']) && isset($_REQUEST['_wpnonce']) && wp_verify_nonce(sanitize_text_field(wp_unslash($_REQUEST['_wpnonce'])), 'bulk-posts')) {
+			$approved_events = sanitize_text_field(wp_unslash($_REQUEST['approved_events']));
 			if(is_array($approved_events)) {
 				$approved_events = array_map('absint', $approved_events);
 				$titles = array();
@@ -174,8 +194,8 @@ class WP_Event_Manager_CPT {
 	public function expired_notice() {
 		global $post_type, $pagenow;
 
-		if($pagenow == 'edit.php' && $post_type == 'event_listing' && !empty($_REQUEST['expired_events'])) {
-			$expired_events = esc_attr($_REQUEST['expired_events']);
+		if($pagenow == 'edit.php' && $post_type == 'event_listing' && !empty($_REQUEST['expired_events']) && isset($_REQUEST['_wpnonce']) && wp_verify_nonce(sanitize_text_field(wp_unslash($_REQUEST['_wpnonce'])), 'bulk-posts')) {
+			$expired_events = sanitize_text_field(wp_unslash($_REQUEST['expired_events']));
 			if(is_array($expired_events)) {
 				$expired_events = array_map('absint', $expired_events);
 				$titles = array();
@@ -195,28 +215,59 @@ class WP_Event_Manager_CPT {
 	public function events_by_category() {
 		global $typenow, $wp_query;
 
+		// Only show this filter to users who can edit event listings.
+		if ( ! current_user_can( 'edit_event_listings' ) ) {
+			return;
+		}
+
 		if($typenow != 'event_listing' || !taxonomy_exists('event_listing_category')) {
 			return;
 		}
 		include_once EVENT_MANAGER_PLUGIN_DIR . '/includes/wp-event-manager-category-walker.php';
-		$r = array();
-		$r['pad_counts'] = 1;
-		$r['hierarchical'] = 1;
-		$r['hide_empty'] = 0;
-		$r['show_count'] = 1;
-		$r['selected'] = (isset($wp_query->query['event_listing_category'])) ? $wp_query->query['event_listing_category'] : '';
-		$r['menu_order'] = false;
-		$terms = get_terms('event_listing_category', $r);
-		$walker = new WP_Event_Manager_Category_Walker();
+		$args = array(
+			'taxonomy'     => 'event_listing_category',
+			'pad_counts'   => 1,
+			'hierarchical' => 1,
+			'hide_empty'   => false,
+			'show_count'   => 1,
+			'selected'     => isset($wp_query->query['event_listing_category']) ? $wp_query->query['event_listing_category'] : '',
+			'menu_order'   => false,
+		);
+		$terms  = get_terms($args);
+		$walker = new WPEM_Event_Manager_Category_Walker();
 
 		if(!$terms) {
 			return;
 		}
+		$selected_category = '';
+
+		if ( isset( $_GET['event_listing_category'] ) && isset( $_GET['_wpnonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'wpem_category_filter' ) ) {
+			$selected_category = sanitize_text_field( wp_unslash( $_GET['event_listing_category'] ) );
+		}
 		$output = "<select name='event_listing_category' id='dropdown_event_listing_category'>";
-		$output .= '<option value="" ' . selected(isset($_GET['event_listing_category']) ? esc_attr( wp_unslash( $_GET['event_listing_category'] ) ) : '', '', false) . '>' . __('Select category', 'wp-event-manager') . '</option>';
-		$output .= $walker->walk($terms, 0, $r);
+		$output .= '<option value="" ' . selected($selected_category, '', false) . '>' . esc_html__('Select category', 'wp-event-manager') . '</option>';
+		$output .= $walker->walk($terms, 0, $args);
 		$output .= '</select>';
-		printf('%s', $output);
+		// Allow select and option tags with their common attributes
+		$allowed_html = array(
+			'select' => array(
+				'name' => true,
+				'id' => true,
+				'class' => true,
+				'style' => true,
+				'title' => true,
+				'data-*' => true,
+				'aria-*' => true,
+			),
+			'option' => array(
+				'value' => true,
+				'selected' => true,
+				'disabled' => true,
+				'class' => true,
+				'data-*' => true,
+			),
+		);
+		echo wp_kses($output, $allowed_html);
 	}
 
 	/**
@@ -229,26 +280,44 @@ class WP_Event_Manager_CPT {
 			return;
 		}
 
-		$args = array();
-		$args['pad_counts']   = 1;
-		$args['hierarchical'] = 1;
-		$args['hide_empty']   = 0;
-		$args['show_count']   = 1;
-		$args['selected']     = (isset($wp_query->query['event_listing_type'])) ? $wp_query->query['event_listing_type'] : '';
-		$args['menu_order']   = false;
-		$terms             = get_terms('event_listing_type', $args);
-		$walker            = new WP_Event_Manager_Category_Walker();
+		$args = array(	
+			'taxonomy'     => 'event_listing_type',
+			'pad_counts'   => true,
+			'hierarchical' => true,
+			'hide_empty'   => false,
+			'show_count'   => true,
+			'selected'     => isset($wp_query->query['event_listing_type']) ? $wp_query->query['event_listing_type'] : '',
+			'menu_order'   => false,
+		);
+		$terms   = get_terms($args);
+		$walker  = new WPEM_Event_Manager_Category_Walker();
 
 		if(!$terms) {
 			return;
 		}
 
-		$output  = "<select name='event_listing_type' id='dropdown_event_listing_category'>";
-		$output .= '<option value="" ' . selected(isset($_GET['event_listing_type']) ? esc_attr( wp_unslash( $_GET['event_listing_type'] ) ) : '', '', false) . '>' . __('Select Event Type', 'wp-event-manager') . '</option>';
-		$output .= $walker->walk($terms, 0, $args);
-		$output .= '</select>';
-
-		printf('%s', $output);
+		$selected_event_type = '';
+		if ( isset( $_GET['event_listing_type'] ) && isset( $_GET['_wpnonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'wpem_event_type_filter' ) ) {
+			$selected_event_type = sanitize_text_field( wp_unslash( $_GET['event_listing_type'] ) );
+		}
+		echo wp_kses(
+			"<select name='event_listing_type' id='event_listing_type'>" .
+			'<option value="" ' . selected($selected_event_type, '', false) . '>' . esc_html__('Select Event Type', 'wp-event-manager') . '</option>' .
+			$walker->walk($terms, 0, $args) .
+			'</select>',
+			array(
+				'select' => array(
+					'name' => true,
+					'id' => true,
+					'class' => true
+				),
+				'option' => array(
+					'value' => true,
+					'selected' => true,
+					'class' => true
+				)
+			)
+		);
 	}
 
 	/**
@@ -271,25 +340,78 @@ class WP_Event_Manager_CPT {
 	 * @param mixed $messages
 	 * @return void
 	 */
-	public function post_updated_messages($messages) {
+	public function post_updated_messages( $messages ) {
 		global $post, $post_ID, $wp_post_types;
+
+		// Allowed HTML for messages
+		$allowed_html = array(
+			'a' => array(
+				'href'   => array(),
+				'target' => array(),
+			),
+			'strong' => array(),
+		);
+
+		// Sanitize revision ID if present
+		$revision_id = isset( $_GET['revision'] ) && isset( $_GET['_wpnonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'wpem_revision_check' ) ? absint( wp_unslash( $_GET['revision'] ) )	: 0;
 
 		$messages['event_listing'] = array(
 			0  => '',
-			1  => sprintf(wp_kses('%1$s updated. <a href="%2$s">View</a>', 'wp-event-manager'), $wp_post_types['event_listing']->labels->singular_name, esc_url(get_permalink($post_ID))),
-			2  => __('Custom field updated.', 'wp-event-manager'),
-			3  => __('Custom field deleted.', 'wp-event-manager'),
-			4  => sprintf(wp_kses('%s updated.', 'wp-event-manager'), $wp_post_types['event_listing']->labels->singular_name),
-			5  => isset($_GET['revision']) ? sprintf(wp_kses('%1$s restored to revision from %2$s', 'wp-event-manager'), $wp_post_types['event_listing']->labels->singular_name, wp_post_revision_title((int) esc_attr($_GET['revision']), false)) : false,
-			6  => sprintf(wp_kses('%1$s published. <a href="%2$s">View</a>', 'wp-event-manager'), $wp_post_types['event_listing']->labels->singular_name, esc_url(get_permalink($post_ID))),
-			7  => sprintf('%s saved.', 'wp-event-manager'), $wp_post_types['event_listing']->labels->singular_name,
-			8  => sprintf(wp_kses('%1$s submitted. <a target="_blank" href="%2$s">Preview</a>', 'wp-event-manager'), $wp_post_types['event_listing']->labels->singular_name, esc_url(add_query_arg('preview', 'true', get_permalink($post_ID)))),
-			9  => sprintf(wp_kses('%s scheduled for: <strong>%1$s</strong>. <a target="_blank" href="%2$s">Preview</a>', 'wp-event-manager'),
-				$wp_post_types['event_listing']->labels->singular_name,
-				date_i18n(__('M j, Y @ G:i', 'wp-event-manager'), strtotime($post->post_date)),
-				esc_url(get_permalink($post_ID))),
-			10 => sprintf(wp_kses('%1$s draft updated. <a target="_blank" href="%2$s">Preview</a>', 'wp-event-manager'), $wp_post_types['event_listing']->labels->singular_name, esc_url(add_query_arg('preview', 'true', get_permalink($post_ID)))),
+			1  => sprintf(
+				wp_kses( '%1$s updated. <a href="%2$s">View</a>', $allowed_html ),
+				esc_html( $wp_post_types['event_listing']->labels->singular_name ),
+				esc_url( get_permalink( $post_ID ) )
+			),
+			2  => __( 'Custom field updated.', 'wp-event-manager' ),
+			3  => __( 'Custom field deleted.', 'wp-event-manager' ),
+			4  => sprintf(
+				wp_kses( '%s updated.', $allowed_html ),
+				esc_html( $wp_post_types['event_listing']->labels->singular_name )
+			),
+			5  => $revision_id
+				? sprintf(
+					wp_kses( '%1$s restored to revision from %2$s', $allowed_html ),
+					esc_html( $wp_post_types['event_listing']->labels->singular_name ),
+					wp_post_revision_title( $revision_id, false )
+				)
+				: false,
+			6  => sprintf(
+				wp_kses( '%1$s published. <a href="%2$s">View</a>', $allowed_html ),
+				esc_html( $wp_post_types['event_listing']->labels->singular_name ),
+				esc_url( get_permalink( $post_ID ) )
+			),
+			7 => sprintf(
+				/* translators: %s: singular post type name */
+				__( '%s saved.', 'wp-event-manager' ),
+				esc_html( $wp_post_types['event_listing']->labels->singular_name )
+			),
+			8  => sprintf(
+				wp_kses( '%1$s submitted. <a target="_blank" href="%2$s">Preview</a>', $allowed_html ),
+				esc_html( $wp_post_types['event_listing']->labels->singular_name ),
+				esc_url( add_query_arg( 'preview', 'true', get_permalink( $post_ID ) ) )
+			),
+			9  => sprintf(
+				wp_kses( '%s scheduled for: <strong>%1$s</strong>. <a target="_blank" href="%2$s">Preview</a>', $allowed_html ),
+				esc_html( $wp_post_types['event_listing']->labels->singular_name ),
+				date_i18n(
+					__( 'M j, Y @ G:i', 'wp-event-manager' ),
+					strtotime( $post->post_date )
+				),
+				esc_url( get_permalink( $post_ID ) )
+			),
+			10 => sprintf(
+				wp_kses( '%1$s draft updated. <a target="_blank" href="%2$s">Preview</a>', $allowed_html ),
+				esc_html( $wp_post_types['event_listing']->labels->singular_name ),
+				esc_url(
+					add_query_arg(
+						'preview',
+						'true',
+						get_permalink( $post_ID )
+					)
+				)
+			),
 		);
+
 		return $messages;
 	}
 
@@ -322,7 +444,7 @@ class WP_Event_Manager_CPT {
 		if(!get_option('enable_event_organizer')) {
 			unset($columns['event_organizer']);
 		}
-		return apply_filters('wp_event_manager_cpt_event_column', $columns);
+		return apply_filters('wpem_cpt_event_column', $columns);
 	}
 
 	/**
@@ -368,10 +490,10 @@ class WP_Event_Manager_CPT {
 		global $post;
 		switch ($column) {
 			case 'event_status':
-				echo wp_kses_post('<span data-tip="' . esc_attr(get_event_status($post)) . '" class="tips status-' . esc_attr($post->post_status) . '">' . esc_attr(get_event_status($post)) . '</span>');
+				echo wp_kses_post('<span data-tip="' . esc_attr(wpem_get_event_status($post)) . '" class="tips status-' . esc_attr($post->post_status) . '">' . esc_attr(wpem_get_event_status($post)) . '</span>');
 				break;
 			case 'cancelled':
-				if(is_event_cancelled($post)) {
+				if(wpem_is_event_cancelled($post)) {
 					echo wp_kses_post('<span class="tips dashicons dashicons-no" data-tip="' . __('Cancelled', 'wp-event-manager') . '">' . __('Cancelled', 'wp-event-manager') . '</span>');
 				} else {
 					echo wp_kses_post('&ndash;');
@@ -379,7 +501,7 @@ class WP_Event_Manager_CPT {
 				break;
 				'<span class="tips dashicons dashicons-format-image" data-tip="' . __('Banner', 'wp-event-manager') . '">' . __('Banner', 'wp-event-manager') . '</span>';
 			case 'featured_event':
-				if(is_event_featured($post)) {
+				if(wpem_is_event_featured($post)) {
 					echo wp_kses_post('<span class="tips dashicons dashicons-star-filled" data-tip="' . __('Featured', 'wp-event-manager') . '">' . __('Featured', 'wp-event-manager') . '</span>');
 				} else {
 					echo wp_kses_post('<span class="tips dashicons dashicons-star-empty" data-tip="' . __('Not Featured', 'wp-event-manager') . '">' . __('Not Featured', 'wp-event-manager') . '</span>');
@@ -387,7 +509,7 @@ class WP_Event_Manager_CPT {
 				break;
 			case 'event_banner':
 				echo wp_kses_post('<div class="event_banner">');
-				display_event_banner();
+				wpem_display_event_banner();
 				echo wp_kses_post('</div>');
 				break;
 			case 'event_title':
@@ -397,7 +519,7 @@ class WP_Event_Manager_CPT {
 				echo wp_kses_post('<button type="button" class="toggle-row"><span class="screen-reader-text">' . esc_html__('Show more details', 'wp-event-manager') . '</span></button>');
 				break;
 			case 'event_listing_type':
-				$types = get_event_type($post);
+				$types = wpem_get_event_type($post);
 				if($types && !empty($types)) {
 					foreach ($types as $type) {
 						echo wp_kses_post('<span class="event-type ' . $type->slug . '">' . $type->name . '</span>');
@@ -405,11 +527,11 @@ class WP_Event_Manager_CPT {
 				}
 				break;
 			case 'event_location':
-				display_event_location($post);
+				wpem_display_event_location($post);
 				break;
 			case 'event_organizer':
 				echo wp_kses_post('<div class="organizer">');
-				echo wp_kses_post(get_organizer_name('', true, 'backend'));
+				echo wp_kses_post(wpem_get_organizer_name('', true, 'backend'));
 				echo wp_kses_post('</div>');
 				break;
 			case 'event_start_date':
@@ -457,7 +579,7 @@ class WP_Event_Manager_CPT {
 				break;
 			case 'event_actions':
 				echo wp_kses_post('<div class="actions">');
-				$admin_actions = apply_filters('post_row_actions', array(), $post);
+				$admin_actions = apply_filters('wpem_event_listing_row_actions', array(), $post);
 				if(in_array($post->post_status, array('pending', 'pending_payment')) && current_user_can('publish_post', $post->ID)) {
 					$admin_actions['approve'] = array(
 						'action' => 'approve',
@@ -482,7 +604,7 @@ class WP_Event_Manager_CPT {
 						$admin_actions['duplicate'] = array(
 							'action' => 'duplicate',
 							'name'   => __('Duplicate', 'wp-event-manager'),
-							'url'    => esc_url(get_duplicate_post_link($post->ID)),
+							'url'    => esc_url(wpem_get_duplicate_post_link($post->ID)),
 						);
 					}
 					if(current_user_can('delete_post', $post->ID)) {
@@ -523,9 +645,9 @@ class WP_Event_Manager_CPT {
 		}
 
 		$post_id = absint($_GET['post']);
-		$nonce = $_GET['_wpnonce'];
+		$nonce = sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ?? '' ) );
 
-		if (!wp_verify_nonce($nonce, 'duplicate_event_' . $post_id)) {
+		if (!wp_verify_nonce(sanitize_text_field(wp_unslash($nonce)), 'duplicate_event_' . $post_id)) {
 			wp_die('Nonce verification failed');
 		}
 
@@ -558,7 +680,9 @@ class WP_Event_Manager_CPT {
 			wp_set_object_terms($new_post_id, $terms, $taxonomy, false);
 		}
 
-		wp_redirect(admin_url('post.php?action=edit&post=' . $new_post_id));
+		wp_safe_redirect(
+			admin_url( 'post.php?action=edit&post=' . $new_post_id )
+		);
 		exit;
 	}
 
@@ -679,31 +803,50 @@ class WP_Event_Manager_CPT {
 	 */
 	public function extend_submitdiv_post_status() {
 		global $post, $post_type;
-
 		// Abort if we're on the wrong post type, but only if we got a restriction
 		if('event_listing' !== $post_type) {
 			return;
 		}
-
+		
+		// Ensure the function exists
+		if(!function_exists('wpem_get_event_listing_post_statuses')) {
+			return;
+		}
+		
 		// Get all non-builtin post status and add them as <option>
 		$options = $display = '';
-		foreach (get_event_listing_post_statuses() as $status => $name) {
+		$post_statuses = wpem_get_event_listing_post_statuses();
+		
+		if(empty($post_statuses) || !is_array($post_statuses)) {
+			return;
+		}
+		$display = isset($post_statuses[0]) ? $post_statuses[0] : 'draft';
+		foreach ($post_statuses as $status => $name) {
 			$selected = selected($post->post_status, $status, false);
 			// If we one of our custom post status is selected, remember it
-			$selected and $display = $name;
+			if($selected) {
+				$display = $name;
+			}
 			// Build the options
 			$options .= "<option{$selected} value='{$status}'>{$name}</option>";
-		} ?>
+		}
+		echo '<input type="hidden" name="' . esc_attr($post_type) . '_status" . " value="' . esc_attr($post->post_status) . '">';
+		?>
 		<script type="text/javascript">
 			jQuery(document).ready(function($) {
-				<?php if(!empty($display)) : ?>
-					jQuery('#post-status-display').html('<?php echo wp_kses_post($display); ?>');
-				<?php endif; ?>
-				var select = jQuery('#post-status-select').find('select');
-				jQuery(select).html("<?php echo $options; ?>");
+				// Wait for the DOM to be fully loaded
+				setTimeout(function() {
+					var statusSelect = jQuery('#post-status-select').find('select');
+					var default_status = jQuery('#event_listing_status').val();
+					if(statusSelect.length > 0) {
+						if(!empty(default_status)) {
+							jQuery('#post-status-display').html('<?php echo wp_kses_post($display); ?>');
+						}
+						statusSelect.html("<?php echo esc_js($options); ?>");
+					}
+				}, 100);
 			});
 		</script>
-<?php
-	}
+	<?php }
 }
 new WP_Event_Manager_CPT();

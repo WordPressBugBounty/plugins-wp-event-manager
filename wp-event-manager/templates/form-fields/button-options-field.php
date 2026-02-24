@@ -1,4 +1,7 @@
 <?php
+if ( ! defined( 'ABSPATH' ) ) {
+    exit; // Exit if accessed directly
+}
 /**
  * Button Options Field. Example definition:
  *
@@ -14,12 +17,12 @@
  * 	)
  */
 
-foreach($field['options'] as $option_key => $value) : ?>
-    <input type="button" name="<?php echo esc_attr( isset( $field['name']) ? $field['name'] : $key); ?>" id="<?php echo esc_attr( $key); ?>" attribute="<?php echo esc_attr( isset( $field['attribute']) ? $field['attribute'] : ''); ?>" value="<?php echo esc_attr( $option_key); ?>" /> <?php echo esc_html( $value); ?>
+foreach($wpem_field['options'] as $wpem_option_key => $wpem_value) : ?>
+    <input type="button" name="<?php echo esc_attr( isset( $wpem_field['name']) ? $wpem_field['name'] : $wpem_key); ?>" id="<?php echo esc_attr( $wpem_key); ?>" attribute="<?php echo esc_attr( isset( $wpem_field['attribute']) ? $wpem_field['attribute'] : ''); ?>" value="<?php echo esc_attr( $wpem_option_key); ?>" /> <?php echo esc_html( $wpem_value); ?>
 <?php endforeach; 
 
-if(!empty( $field['description'])) : ?>
+if(!empty( $wpem_field['description'])) : ?>
     <small class="description">
-        <?php echo wp_kses_post($field['description']); ?>
+        <?php echo wp_kses_post($wpem_field['description']); ?>
     </small>
 <?php endif; ?>

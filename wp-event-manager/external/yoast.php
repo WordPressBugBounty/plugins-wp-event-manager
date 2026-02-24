@@ -1,4 +1,5 @@
 <?php
+if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
 /**
  * Adds additional compatibility with Yoast SEO.
  *
@@ -14,7 +15,7 @@ function event_manager_yoast_skip_cancelled_event_listings($url, $type, $post) {
 	if ('event_listing' !== $post->post_type) {
 		return $url;
 	}
-	if (is_event_cancelled($post)) {
+	if (wpem_is_event_cancelled($post)) {
 		return false;
 	}
 	return $url;

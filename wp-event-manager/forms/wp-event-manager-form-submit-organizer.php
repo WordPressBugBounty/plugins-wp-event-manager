@@ -1,8 +1,11 @@
 <?php
+if ( ! defined( 'ABSPATH' ) ) {
+    exit; // Exit if accessed directly
+}
 /**
- * WP_Event_Manager_Form_Submit_Organizer class.
+ * WPEM_Event_Manager_Form_Submit_Organizer class.
  */
-class WP_Event_Manager_Form_Submit_Organizer extends WP_Event_Manager_Form {
+class WPEM_Event_Manager_Form_Submit_Organizer extends WP_Event_Manager_Form {
 	
 	public    $form_name = 'submit-organizer';
 	public    $steps;
@@ -12,7 +15,7 @@ class WP_Event_Manager_Form_Submit_Organizer extends WP_Event_Manager_Form {
 	protected $preview_organizer;
 	
 	/** @var 
-	* WP_Event_Manager_Form_Submit_Organizer The single instance of the class 
+	* WPEM_Event_Manager_Form_Submit_Organizer The single instance of the class 
 	*/
 	protected static $_instance = null;
 	/**
@@ -45,18 +48,33 @@ class WP_Event_Manager_Form_Submit_Organizer extends WP_Event_Manager_Form {
 		));
 
 		uasort($this->steps, array($this, 'sort_by_priority'));
-		// Get step/event
-		if(isset($_POST['step'])) {
-			$this->step = is_numeric($_POST['step']) ? max(absint($_POST['step']), 0) : array_search(esc_attr($_POST['step']), array_keys($this->steps));
-		} elseif(!empty($_GET['step'])) {
-			$this->step = is_numeric($_GET['step']) ? max(absint($_GET['step']), 0) : array_search(esc_attr($_GET['step']), array_keys($this->steps));
-		}
-
-		$this->organizer_id =!empty($_REQUEST['organizer_id']) ? absint($_REQUEST[ 'organizer_id' ]) : 0;
-		if(!event_manager_user_can_edit_event($this->organizer_id)){
+		$this->organizer_id =!empty($_REQUEST['organizer_id']) ? absint( wp_unslash( $_REQUEST[ 'organizer_id' ])) : 0;
+		if(!event_manager_user_can_edit_organizer($this->organizer_id)){
 			$this->organizer_id = 0;
 		}
-		
+		$step_nonce_ok = false;
+		if ( ! empty( $_POST['_wpnonce'] ) ) {
+			$step_nonce_ok = wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ) ), 'edit-organizer_' . $this->organizer_id );
+		} elseif ( ! empty( $_GET['_wpnonce'] ) ) {
+			$step_nonce_ok = wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'edit-organizer_' . $this->organizer_id );
+		}
+
+		// Get step/event
+		if($step_nonce_ok && isset($_POST['step'])) {
+			if(is_numeric($_POST['step'])) {
+				$this->step = max(absint(wp_unslash($_POST['step'])), 0);
+			} else {
+				$step_value = sanitize_text_field(wp_unslash($_POST['step']));
+				$this->step = array_search($step_value, array_keys($this->steps), true);
+			}
+		} elseif($step_nonce_ok && !empty($_GET['step'])) {
+			if(is_numeric($_GET['step'])) {
+				$this->step = max(absint(wp_unslash($_GET['step'])), 0);
+			} else {
+				$step_value = sanitize_text_field(wp_unslash($_GET['step']));
+				$this->step = array_search($step_value, array_keys($this->steps), true);
+			}
+		}
 		// Allow resuming from cookie.
 		$this->resume_edit = false;
 		if(!isset($_GET[ 'new' ]) &&(!$this->organizer_id) &&!empty($_COOKIE['wp-event-manager-submitting-organizer-id']) &&!empty($_COOKIE['wp-event-manager-submitting-organizer-key'])){
@@ -70,7 +88,7 @@ class WP_Event_Manager_Form_Submit_Organizer extends WP_Event_Manager_Form {
 		if($this->organizer_id) {
 			$organizer_status = get_post_status($this->organizer_id);
 			if('expired' === $organizer_status) {
-				if(!event_manager_user_can_edit_event($this->organizer_id)) {
+				if(!event_manager_user_can_edit_organizer($this->organizer_id)) {
 					$this->organizer_id = 0;
 					$this->step   = 0;
 				}
@@ -219,7 +237,7 @@ class WP_Event_Manager_Form_Submit_Organizer extends WP_Event_Manager_Form {
 		// $this->init_fields(); We dont need to initialize with this function because of field edior
 		// Now field editor function will return all the fields 
 		// Get merged fields from db and default fields.
-		$this->merge_with_custom_fields('frontend');
+		$this->wpem_merge_with_custom_fields('frontend');
 
 		// Get date and time setting defined in admin panel Event listing -> Settings -> Date & Time formatting
 		$datepicker_date_format 	= WP_Event_Manager_Date_Time::get_datepicker_format();
@@ -252,7 +270,7 @@ class WP_Event_Manager_Form_Submit_Organizer extends WP_Event_Manager_Form {
 					
 					if(!empty($field['type']) &&  $field['type'] == 'date'){
 						$event_date = esc_html(get_post_meta($organizer->ID, '_' . $key, true));
-						$this->fields[ $group_key ][ $key ]['value'] = date($php_date_format ,strtotime($event_date));
+						$this->fields[ $group_key ][ $key ]['value'] = gmdate($php_date_format ,strtotime($event_date));
 					}
 				}
 			}
@@ -260,7 +278,7 @@ class WP_Event_Manager_Form_Submit_Organizer extends WP_Event_Manager_Form {
 		}
 		
 		wp_enqueue_script('wp-event-manager-event-submission');
-		get_event_manager_template('organizer-submit.php', 
+		wpem_get_event_manager_template('organizer-submit.php', 
 			array(
 				'form'               => esc_attr($this->form_name),
 				'organizer_id'       => esc_attr($this->get_organizer_id()),
@@ -285,7 +303,7 @@ class WP_Event_Manager_Form_Submit_Organizer extends WP_Event_Manager_Form {
 			return new WP_Error('validation-error', esc_html__( 'Please login as Organizer to add or update an organizer!', 'wp-event-manager')) ;
 		}
 
-		$this->fields =  apply_filters('before_submit_organizer_form_validate_fields', $this->fields , $values);
+		$this->fields =  apply_filters('wpem_before_submit_organizer_form_validate_fields', $this->fields , $values);
 	    foreach($this->fields as $group_key => $group_fields){     	      
 				 
 			foreach($group_fields as $key => $field) {
@@ -350,10 +368,16 @@ class WP_Event_Manager_Form_Submit_Organizer extends WP_Event_Manager_Form {
 			// $this->init_fields(); We dont need to initialize with this function because of field edior
 			// Now field editor function will return all the fields 
 			// Get merged fields from db and default fields.
-			$this->merge_with_custom_fields('frontend');
+			$this->wpem_merge_with_custom_fields('frontend');
 			
 			// Get posted values
 			$values = $this->get_posted_fields();
+			
+			// Verify nonce before processing form submission
+			if ( ! empty( $_POST ) && ( empty( $_POST['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ) ), 'edit-organizer_' . $this->organizer_id ) ) ) {
+				return;
+			}
+			
 			//if(empty($_POST['submit_organizer']) || !is_user_logged_in()) {
 			if(empty($_POST['submit_organizer'])) {
 				return;
@@ -410,8 +434,8 @@ class WP_Event_Manager_Form_Submit_Organizer extends WP_Event_Manager_Form {
 			$this->organizer_id = wp_insert_post($organizer_data);
 			if(!headers_sent()) {
 				$wpem_unique_key = uniqid();
-				setcookie('wp-event-manager-submitting-organizer-id', $this->organizer_id, 0, COOKIEPATH, COOKIE_DOMAIN, false);
-				setcookie('wp-event-manager-submitting-organizer-key', $wpem_unique_key, 0, COOKIEPATH, COOKIE_DOMAIN, false);
+				setcookie('wp-event-manager-submitting-organizer-id', $this->organizer_id, 0, COOKIEPATH, COOKIE_DOMAIN, false, true);
+				setcookie('wp-event-manager-submitting-organizer-key', $wpem_unique_key, 0, COOKIEPATH, COOKIE_DOMAIN, false, true);
 				update_post_meta($this->organizer_id, '_wpem_unique_key', $wpem_unique_key);
 			}
 		}
@@ -560,7 +584,7 @@ class WP_Event_Manager_Form_Submit_Organizer extends WP_Event_Manager_Form {
 	 */
 	public function done() {
 		do_action('event_manager_organizer_submitted', $this->organizer_id);
-		get_event_manager_template(
+		wpem_get_event_manager_template(
 			'organizer-submitted.php', 
 			array(
 				'organizer' => get_post($this->organizer_id),

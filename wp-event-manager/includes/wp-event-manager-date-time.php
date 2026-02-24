@@ -35,7 +35,7 @@ class WP_Event_Manager_Date_Time {
 	* @since 3.0
 	**/
 	public static function get_default_date_formats(){
-		$date_formats['datepicker_date_formats']  = apply_filters('wp_event_manager_datepicker_date_formats',
+		$date_formats['datepicker_date_formats']  = apply_filters('wpem_event_manager_datepicker_date_formats',
 						array(
 							'yy-mm-dd',
 							'm-d-yy',
@@ -53,7 +53,7 @@ class WP_Event_Manager_Date_Time {
 							'dd.mm.yy'
 						)
 			);
-		$date_formats['view_date_formats'] = apply_filters('wp_event_manager_view_date_formats',
+		$date_formats['view_date_formats'] = apply_filters('wpem_event_manager_view_date_formats',
 				array(
 					'Y-m-d',
 					'n-j-Y',
@@ -195,7 +195,7 @@ class WP_Event_Manager_Date_Time {
 	 */
 	public static function get_db_formatted_time($time) {
 		$time = is_numeric($time) ? $time : strtotime($time);
-		return date(self::DBTIMEFORMAT, $time);
+		return gmdate(self::DBTIMEFORMAT, $time);
 	}
 
 	/**
@@ -253,11 +253,11 @@ class WP_Event_Manager_Date_Time {
 	 * @return array
 	 */
 	public static function get_event_manager_date_admin_settings(){
-		$dummy_date = strtotime('January 15 ' . date('Y'));
+		$dummy_date = strtotime('January 15 ' . gmdate('Y'));
 		$default_foramts = self::get_default_date_formats();
 		$setting_values = array();
 		foreach($default_foramts['view_date_formats'] as $key => $value){
-			$setting_values[$key] = date($value, $dummy_date);
+			$setting_values[$key] = gmdate($value, $dummy_date);
 		}
 		return $setting_values;
 	}
@@ -302,10 +302,10 @@ class WP_Event_Manager_Date_Time {
 	 * 
 	 * @param string $tzstring
 	 */
-	public static function wp_event_manager_timezone_choice($tzstring = null){
+	public static function wpem_timezone_choice($tzstring = null){
 		if(empty($tzstring))
 			$tzstring = self::get_current_site_timezone();
-		return apply_filters('wp_event_manager_timezone_choice', wp_timezone_choice($tzstring, get_user_locale()));
+		return apply_filters('wpem_timezone_choice', wp_timezone_choice($tzstring, get_user_locale()));
 	}
 
 	/**
@@ -375,7 +375,7 @@ class WP_Event_Manager_Date_Time {
 		$timezone = timezone_name_from_abbr('', $seconds, 0);
 
 		if(false === $timezone) {
-			$is_dst = date('I');
+			$is_dst = gmdate('I');
 
 			foreach (timezone_abbreviations_list() as $abbr) {
 				foreach ($abbr as $city) {

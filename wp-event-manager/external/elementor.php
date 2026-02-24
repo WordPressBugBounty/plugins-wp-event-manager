@@ -1,6 +1,6 @@
 <?php
 namespace WPEventManager;
-
+if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
 /**
  * Class Plugin
  *
@@ -84,14 +84,19 @@ class Plugin {
 		$ajax_filter_deps = array('jquery', 'jquery-deserialize');
 
 		$chosen_shortcodes   = array('submit_event_form', 'event_dashboard', 'events');
-		$chosen_used_on_page = has_wpem_shortcode(null, $chosen_shortcodes);
+		$chosen_used_on_page = wpem_has_shortcode(null, $chosen_shortcodes);
 
 		//jQuery Chosen - vendor
 		if (apply_filters('event_manager_chosen_enabled', $chosen_used_on_page)) {
 
-			wp_enqueue_style('chosen', EVENT_MANAGER_PLUGIN_URL . '/assets/css/chosen.css');
+			wp_enqueue_style('chosen', EVENT_MANAGER_PLUGIN_URL . '/assets/css/chosen.css', array(), '1.0.0');
 
 			wp_register_script('chosen', EVENT_MANAGER_PLUGIN_URL . '/assets/js/jquery-chosen/chosen.jquery.min.js', array('jquery'), '1.1.0', true);
+			wp_localize_script('chosen', 'wpem_chosen', array(
+				'multiple_text' => __('Select Some Options', 'wp-event-manager'),
+				'single_text' => __('Select an Option', 'wp-event-manager'),
+				'no_result_text' => __('No results match', 'wp-event-manager'),
+			));
 			wp_register_script('wp-event-manager-term-multiselect', EVENT_MANAGER_PLUGIN_URL . '/assets/js/term-multiselect.min.js', array('jquery', 'chosen'), EVENT_MANAGER_VERSION, true);
 			wp_register_script('wp-event-manager-multiselect', EVENT_MANAGER_PLUGIN_URL . '/assets/js/multiselect.min.js', array('jquery', 'chosen'), EVENT_MANAGER_VERSION, true);
 			if (!wp_script_is('chosen', 'enqueued'))
@@ -102,7 +107,7 @@ class Plugin {
 			$ajax_filter_deps[] = 'chosen';
 		}
 	
-		wp_enqueue_style('wp-event-manager-frontend', EVENT_MANAGER_PLUGIN_URL . '/assets/css/frontend.min.css');
+		wp_enqueue_style('wp-event-manager-frontend', EVENT_MANAGER_PLUGIN_URL . '/assets/css/frontend.min.css', array(), '1.0.0');
 
 		//common js
 		wp_register_script('wp-event-manager-common', EVENT_MANAGER_PLUGIN_URL . '/assets/js/common.min.js', array('jquery'), EVENT_MANAGER_VERSION, true);	
@@ -111,8 +116,8 @@ class Plugin {
 			wp_enqueue_script('wp-event-manager-common'); 
 
 		//jQuery UI date rang picker
-		wp_enqueue_style('wp-event-manager-jquery-ui-daterangepicker', EVENT_MANAGER_PLUGIN_URL . '/assets/js/jquery-ui-daterangepicker/jquery.comiseo.daterangepicker.css');
-		wp_enqueue_style('wp-event-manager-jquery-ui-daterangepicker-style', EVENT_MANAGER_PLUGIN_URL . '/assets/js/jquery-ui-daterangepicker/styles.css');
+		wp_enqueue_style('wp-event-manager-jquery-ui-daterangepicker', EVENT_MANAGER_PLUGIN_URL . '/assets/js/jquery-ui-daterangepicker/jquery.comiseo.daterangepicker.css', array(), '1.0.0');
+		wp_enqueue_style('wp-event-manager-jquery-ui-daterangepicker-style', EVENT_MANAGER_PLUGIN_URL . '/assets/js/jquery-ui-daterangepicker/styles.css', array(), '1.0.0');
 		wp_register_script('wp-event-manager-jquery-ui-daterangepicker', EVENT_MANAGER_PLUGIN_URL . '/assets/js/jquery-ui-daterangepicker/jquery.comiseo.daterangepicker.js', array('jquery-ui-core', 'jquery-ui-button', 'jquery-ui-datepicker', 'jquery-ui-menu', 'jquery-ui-widget', 'moment') , EVENT_MANAGER_VERSION, true);
 
 		if (!wp_script_is('wp-event-manager-jquery-ui-daterangepicker', 'enqueued'))
@@ -148,10 +153,10 @@ class Plugin {
 		if (!wp_script_is('wp-event-manager-ajax-filters', 'enqueued'))
 			wp_enqueue_script('wp-event-manager-ajax-filters');
 
-		wp_enqueue_style('wp-event-manager-jquery-ui-css', EVENT_MANAGER_PLUGIN_URL . '/assets/js/jquery-ui/jquery-ui.css');
+		wp_enqueue_style('wp-event-manager-jquery-ui-css', EVENT_MANAGER_PLUGIN_URL . '/assets/js/jquery-ui/jquery-ui.css', array(), '1.0.0');
 		
-		wp_enqueue_style('wp-event-manager-grid-style', EVENT_MANAGER_PLUGIN_URL . '/assets/css/wpem-grid.min.css');
-		wp_enqueue_style('wp-event-manager-font-style', EVENT_MANAGER_PLUGIN_URL . '/assets/fonts/style.css');
+		wp_enqueue_style('wp-event-manager-grid-style', EVENT_MANAGER_PLUGIN_URL . '/assets/css/wpem-grid.min.css', array(), '1.0.0');
+		wp_enqueue_style('wp-event-manager-font-style', EVENT_MANAGER_PLUGIN_URL . '/assets/fonts/style.css', array(), '1.0.0');
 	}
 
 	/**

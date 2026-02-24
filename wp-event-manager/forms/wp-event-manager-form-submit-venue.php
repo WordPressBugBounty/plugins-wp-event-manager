@@ -1,8 +1,11 @@
 <?php
+if ( ! defined( 'ABSPATH' ) ) {
+    exit; // Exit if accessed directly
+}
 /**
- * WP_Event_Manager_Form_Submit_Venue class.
+ * WPEM_Event_Manager_Form_Submit_Venue class.
  */
-class WP_Event_Manager_Form_Submit_Venue extends WP_Event_Manager_Form {
+class WPEM_Event_Manager_Form_Submit_Venue extends WP_Event_Manager_Form {
 	
 	public    $form_name = 'submit-venue';
 	public    $steps;
@@ -11,7 +14,7 @@ class WP_Event_Manager_Form_Submit_Venue extends WP_Event_Manager_Form {
 	protected $venue_id;
 	protected $preview_venue;
 	/** @var 
-	* WP_Event_Manager_Form_Submit_Venue The single instance of the class 
+	* WPEM_Event_Manager_Form_Submit_Venue The single instance of the class 
 	*/
 	protected static $_instance = null;
 	/**
@@ -45,18 +48,34 @@ class WP_Event_Manager_Form_Submit_Venue extends WP_Event_Manager_Form {
 		));
 
 		uasort($this->steps, array($this, 'sort_by_priority'));
-		// Get step/event
-		if(isset($_POST['step'])) {
-			$this->step = is_numeric($_POST['step']) ? max(absint($_POST['step']), 0) : array_search(esc_attr($_POST['step']), array_keys($this->steps));
-		} elseif(!empty($_GET['step'])) {
-			$this->step = is_numeric(esc_attr($_GET['step'])) ? max(absint($_GET['step']), 0) : array_search(esc_attr($_GET['step']), array_keys($this->steps));
-		}
-		$this->venue_id = !empty($_REQUEST['venue_id']) ? absint($_REQUEST[ 'venue_id' ]) : 0;
-		if(!event_manager_user_can_edit_event($this->venue_id)) {
+		$this->venue_id = !empty($_REQUEST['venue_id']) ? absint( wp_unslash( $_REQUEST[ 'venue_id' ])) : 0;
+		if(!event_manager_user_can_edit_venue($this->venue_id)) {
 			$this->venue_id = 0;
 		}
-		// Allow resuming from cookie.
-		$this->resume_edit = false;
+		$step_nonce_ok = false;
+		if ( ! empty( $_POST['_wpnonce'] ) ) {
+			$step_nonce_ok = wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ) ), 'edit-venue_' . $this->venue_id );
+		} elseif ( ! empty( $_GET['_wpnonce'] ) ) {
+			$step_nonce_ok = wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'edit-venue_' . $this->venue_id );
+		}
+
+		// Get step/event
+		if($step_nonce_ok && isset($_POST['step'])) {
+			$step_value = sanitize_text_field(wp_unslash($_POST['step']));
+			$this->step = is_numeric($step_value) ? max(absint($step_value), 0) : array_search($step_value, array_keys($this->steps), true);
+		} elseif($step_nonce_ok && !empty($_GET['step'])) {
+			$step_input = isset( $_GET['step'] ) ? sanitize_text_field(wp_unslash( $_GET['step'] )) : 1;
+			if ( is_numeric( $step_input ) ) {
+				$this->step = max( absint( $step_input ), 0 );
+			} else {
+				// sanitize as string for safe array_search
+				$step_input_sanitized = sanitize_text_field( $step_input );
+				$this->step = array_search( $step_input_sanitized, array_keys( $this->steps ), true );
+			}
+		}
+		if(!event_manager_user_can_edit_venue($this->venue_id)) {
+		$this->venue_id = 0;
+		}
 		if(!isset($_GET[ 'new' ]) &&(!$this->venue_id) && !empty($_COOKIE['wp-event-manager-submitting-venue-id']) && !empty($_COOKIE['wp-event-manager-submitting-venue-key'])){
 			$venue_id     = absint($_COOKIE['wp-event-manager-submitting-venue-id']);
 			$venue_status = get_post_status($venue_id);
@@ -68,7 +87,7 @@ class WP_Event_Manager_Form_Submit_Venue extends WP_Event_Manager_Form {
 		if($this->venue_id) {
 			$venue_status = get_post_status($this->venue_id);
 			if('expired' === $venue_status) {
-				if(!event_manager_user_can_edit_event($this->venue_id)) {
+				if(!event_manager_user_can_edit_venue($this->venue_id)) {
 					$this->venue_id = 0;
 					$this->step   = 0;
 				}
@@ -121,6 +140,21 @@ class WP_Event_Manager_Form_Submit_Venue extends WP_Event_Manager_Form {
 						'jpg'  => 'image/jpeg',
 						'jpeg' => 'image/jpeg',
 						'gif'  => 'image/gif',
+						'png'  => 'image/png'
+					),
+					'visibility'  => 1,
+				),
+				'venue_qrcode' => array(
+					'label'       => __('Venue QRCode', 'wp-event-manager'),
+					'type'        => 'file',
+					'required'    => false,
+					'placeholder' => '',
+					'priority'    => 3,
+					'ajax'        => true,
+					'multiple'    => false,
+					'allowed_mime_types' => array(
+						'jpg'  => 'image/jpeg',
+						'jpeg' => 'image/jpeg',
 						'png'  => 'image/png'
 					),
 					'visibility'  => 1,
@@ -200,7 +234,7 @@ class WP_Event_Manager_Form_Submit_Venue extends WP_Event_Manager_Form {
 		//$this->init_fields(); We dont need to initialize with this function because of field edior
 		// Now field editor function will return all the fields 
 		//Get merged fields from db and default fields.
-		$this->merge_with_custom_fields('frontend');
+		$this->wpem_merge_with_custom_fields('frontend');
 
 		//get date and time setting defined in admin panel Event listing -> Settings -> Date & Time formatting
 		$datepicker_date_format 	= WP_Event_Manager_Date_Time::get_datepicker_format();
@@ -233,7 +267,7 @@ class WP_Event_Manager_Form_Submit_Venue extends WP_Event_Manager_Form {
 					
 					if(!empty($field['type']) &&  $field['type'] == 'date'){
 						$event_date = esc_html(get_post_meta($venue->ID, '_' . $key, true));
-						$this->fields[ $group_key ][ $key ]['value'] = date($php_date_format ,strtotime($event_date));
+						$this->fields[ $group_key ][ $key ]['value'] = gmdate($php_date_format ,strtotime($event_date));
 					}
 				}
 			}
@@ -241,7 +275,7 @@ class WP_Event_Manager_Form_Submit_Venue extends WP_Event_Manager_Form {
 		}
 
 		wp_enqueue_script('wp-event-manager-event-submission');
-		get_event_manager_template('venue-submit.php', 
+		wpem_get_event_manager_template('venue-submit.php', 
 			array(
 				'form'               => esc_attr($this->form_name),
 				'venue_id'       	 =>esc_attr($this->get_venue_id()),
@@ -265,7 +299,7 @@ class WP_Event_Manager_Form_Submit_Venue extends WP_Event_Manager_Form {
 		if ( ! is_user_logged_in() || ( ! current_user_can( 'manage_venues' ) && ! current_user_can( 'manage_options' ) ) ) {
 			return new WP_Error('validation-error', esc_html__( 'Please login as Organizer to add or update venue!', 'wp-event-manager')) ;
 		}
-		$this->fields =  apply_filters('before_submit_venue_form_validate_fields', $this->fields , $values);
+		$this->fields =  apply_filters('wpem_before_submit_venue_form_validate_fields', $this->fields , $values);
 	      foreach($this->fields as $group_key => $group_fields){     	      
 				 
 			foreach($group_fields as $key => $field) {
@@ -328,10 +362,15 @@ class WP_Event_Manager_Form_Submit_Venue extends WP_Event_Manager_Form {
 			//$this->init_fields(); We dont need to initialize with this function because of field edior
 			// Now field editor function will return all the fields 
 			//Get merged fields from db and default fields.
-			$this->merge_with_custom_fields('frontend');
+			$this->wpem_merge_with_custom_fields('frontend');
 			
 			// Get posted values
 			$values = $this->get_posted_fields();
+			
+			// Verify nonce before processing form submission
+			if ( ! empty( $_POST ) && ( empty( $_POST['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ) ), 'edit-venue_' . $this->venue_id ) ) ) {
+				return;
+			}
 
 			if(empty($_POST['submit_venue'])) {
 				return;
@@ -388,8 +427,8 @@ class WP_Event_Manager_Form_Submit_Venue extends WP_Event_Manager_Form {
 			$this->venue_id = wp_insert_post($venue_data);
 			if(!headers_sent()) {
 				$wpem_unique_key = uniqid();
-				setcookie('wp-event-manager-submitting-venue-id', $this->venue_id, 0, COOKIEPATH, COOKIE_DOMAIN, false);
-				setcookie('wp-event-manager-submitting-venue-key', $wpem_unique_key, 0, COOKIEPATH, COOKIE_DOMAIN, false);
+				setcookie('wp-event-manager-submitting-venue-id', $this->venue_id, 0, COOKIEPATH, COOKIE_DOMAIN, false, true);
+				setcookie('wp-event-manager-submitting-venue-key', $wpem_unique_key, 0, COOKIEPATH, COOKIE_DOMAIN, false, true);
 				update_post_meta($this->venue_id, '_wpem_unique_key', $wpem_unique_key);
 			}
 		}
@@ -534,7 +573,7 @@ class WP_Event_Manager_Form_Submit_Venue extends WP_Event_Manager_Form {
 	 */
 	public function done() {
 		do_action('event_manager_venue_submitted', $this->venue_id);
-		get_event_manager_template(
+		wpem_get_event_manager_template(
 			'venue-submitted.php', 
 			array(
 				'venue' => get_post($this->venue_id) 

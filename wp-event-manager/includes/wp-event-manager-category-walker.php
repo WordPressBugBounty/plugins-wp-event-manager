@@ -2,11 +2,11 @@
 if(!defined('ABSPATH')) exit; // Exit if accessed directly
 
 /**
- * WP_Event_Manager_Category_Walker class.
+ * WPEM_Event_Manager_Category_Walker class.
  *
  * @extends Walker
  */
-class WP_Event_Manager_Category_Walker extends Walker {
+class WPEM_Event_Manager_Category_Walker extends Walker {
 
 	var $tree_type = 'category';
 	var $db_fields = array ('parent' => 'parent', 'id' => 'term_id', 'slug' => 'slug');
@@ -27,7 +27,7 @@ class WP_Event_Manager_Category_Walker extends Walker {
 		else
 			$pad = '';
 
-		$cat_name = apply_filters('list_event_cats', $object->name, $object);
+		$cat_name = apply_filters('wpem_list_event_cats', $object->name, $object);
 		$value = isset($args['value']) && $args['value'] == 'id' ? $object->term_id : $object->slug;
 		$output .= "\t<option class=\"level-" . intval($depth) . '" value="' . esc_attr($value) . '"';
 		if($value == $args['selected'] || (is_array($args['selected']) && in_array($value, $args['selected'])))

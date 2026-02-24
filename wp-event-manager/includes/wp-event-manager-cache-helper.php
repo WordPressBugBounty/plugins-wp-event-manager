@@ -32,7 +32,7 @@ class WP_Event_Manager_Cache_Helper {
 	 */
 	public static function flush_get_event_listings_cache($post_id) {
 		if('event_listing' === get_post_type($post_id)) {
-			self::get_transient_version('get_event_listings', true);
+			self::get_transient_version('wpem_get_event_listings', true);
 		}
 	}
 
@@ -41,7 +41,7 @@ class WP_Event_Manager_Cache_Helper {
 	 */
 	public static function event_manager_my_event_do_action($action) {
 		if('mark_cancelled' === $action || 'mark_not_cancelled' === $action) {
-			self::get_transient_version('get_event_listings', true);
+			self::get_transient_version('wpem_get_event_listings', true);
 		}
 	}
 
@@ -95,7 +95,13 @@ class WP_Event_Manager_Cache_Helper {
 	private static function delete_version_transients($version) {
 		if(!wp_using_ext_object_cache() && !empty($version)) {
 			global $wpdb;
-			$wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->options} WHERE option_name LIKE %s;", "\_transient\_%" . $version));
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+			$wpdb->query(
+				$wpdb->prepare(
+					"DELETE FROM {$wpdb->options} WHERE option_name LIKE %s;",
+					"_transient_%" . $version
+				)
+			);
 		}
 	}
 
@@ -104,15 +110,36 @@ class WP_Event_Manager_Cache_Helper {
 	 */
 	public static function clear_expired_transients() {
 		global $wpdb;
-		if(!wp_using_ext_object_cache() && !defined('WP_SETUP_CONFIG') && !defined('WP_INSTALLING')) {
-			$sql= "
-			    DELETE a, b FROM $wpdb->options a, $wpdb->options b	
- 				WHERE a.option_name LIKE %s	
- 				AND a.option_name NOT LIKE %s
- 				AND b.option_name = CONCAT('_transient_timeout_', SUBSTRING(a.option_name, 12))
-				AND b.option_value < %s;";
-				$wpdb->query($wpdb->prepare($sql, $wpdb->esc_like('_transient_em_') . '%', $wpdb->esc_like('_transient_timeout_em_') . '%', time()));
- 		}
+		if (
+			! wp_using_ext_object_cache() &&
+			! defined( 'WP_SETUP_CONFIG' ) &&
+			! defined( 'WP_INSTALLING' )
+		) {
+			// Table names can be safely interpolated
+			global $wpdb;
+
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+			$like_transient         = $wpdb->esc_like( '_transient_em_' ) . '%';
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+			$like_timeout_transient = $wpdb->esc_like( '_transient_timeout_em_' ) . '%';
+			$now                    = time();
+			$wpdb->query(
+				$wpdb->prepare(
+					"
+					DELETE a, b
+					FROM {$wpdb->options} a
+					INNER JOIN {$wpdb->options} b
+						ON b.option_name = CONCAT( '_transient_timeout_', SUBSTRING( a.option_name, 12 ) )
+					WHERE a.option_name LIKE %s
+					AND a.option_name NOT LIKE %s
+					AND b.option_value < %d
+					",
+					$like_transient,
+					$like_timeout_transient,
+					$now
+				)
+			);
+		}
 	}
 	
 	/**
@@ -135,7 +162,7 @@ class WP_Event_Manager_Cache_Helper {
 		 * @param string  $old_status Old post status.
 		 * @param WP_Post $post       Post object.
 		 */
-		$post_types = apply_filters('wp_eventmanager_count_cache_supported_post_types', array('event_listing'), $new_status, $old_status, $post);
+		$post_types = apply_filters('wpem_eventmanager_count_cache_supported_post_types', array('event_listing'), $new_status, $old_status, $post);
 		
 		// Only proceed when statuses do not match, and post type is supported post type
 		if($new_status === $old_status || !in_array($post->post_type, $post_types)) {
@@ -149,7 +176,7 @@ class WP_Event_Manager_Cache_Helper {
 		 * @param string  $old_status    Old post status.
 		 * @param WP_Post $post          Post object.
 		 */
-		$valid_statuses = apply_filters('wp_eventmanager_count_cache_supported_statuses', array('pending'), $new_status, $old_status, $post);
+		$valid_statuses = apply_filters('wpem_eventmanager_count_cache_supported_statuses', array('pending'), $new_status, $old_status, $post);
 		
 		$rlike = array();
 		// New status transient option name
@@ -165,8 +192,15 @@ class WP_Event_Manager_Cache_Helper {
 			return;
 		}
 		
-		$sql        = $wpdb->prepare("SELECT option_name FROM $wpdb->options WHERE option_name RLIKE '%s'", implode('|', $rlike));
-		$transients = $wpdb->get_col($sql);
+		$pattern     = implode( '|', $rlike );
+		// Ensure $pattern is a safe string (non-user input, or sanitized if user input)
+		$pattern_safe = sanitize_text_field( $pattern );
+		$sql = $wpdb->prepare(
+			"SELECT option_name FROM {$wpdb->options} WHERE option_name RLIKE %s",
+			$pattern_safe
+		);
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$transients = $wpdb->get_col( $sql );
 		
 		// For each transient...
 		foreach ($transients as $transient) {

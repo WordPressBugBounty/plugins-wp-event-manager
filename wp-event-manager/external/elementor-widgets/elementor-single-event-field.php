@@ -95,12 +95,12 @@ class Elementor_Event_Field extends Widget_Base {
 
         $arrOption = [];
 
-        if (!class_exists('WP_Event_Manager_Form_Submit_Event')) {
+        if (!class_exists('WPEM_Event_Manager_Form_Submit_Event')) {
             include_once(EVENT_MANAGER_PLUGIN_DIR . '/forms/wp-event-manager-form-abstract.php');
             include_once(EVENT_MANAGER_PLUGIN_DIR . '/forms/wp-event-manager-form-submit-event.php');
         }
-        $form_submit_event_instance = call_user_func(array('WP_Event_Manager_Form_Submit_Event', 'instance'));
-        $fields = $form_submit_event_instance->merge_with_custom_fields('backend');
+        $form_submit_event_instance = call_user_func(array('WPEM_Event_Manager_Form_Submit_Event', 'instance'));
+        $fields = $form_submit_event_instance->wpem_merge_with_custom_fields('backend');
         foreach ($fields as $group_key => $group_fields) {
             foreach ($group_fields as $field_key => $field) {
                 if(isset($field['visibility']) && ($field['visibility'] == 1 || $field['visibility'] == true))
@@ -165,78 +165,78 @@ class Elementor_Event_Field extends Widget_Base {
 
         $event = get_post($post_id);
 
-        echo $settings['event_field_before_html'];
+        echo wp_kses_post($settings['event_field_before_html']);
 
         if (isset($settings['event_field']) && $settings['event_field'] != '') {
             if ($settings['event_field'] == 'event_title') {
-                display_event_title($event);
+                wpem_display_event_title($event);
             } else if ($settings['event_field'] == 'event_type') {
-                display_event_type($event, '');
+                wpem_display_event_type($event, '');
             } else if ($settings['event_field'] == 'event_category') {
-                display_event_category($event, '');
+                wpem_display_event_category($event, '');
             } else if ($settings['event_field'] == 'event_online') {
-                $is_event_online = is_event_online($event);
+                $is_event_online = wpem_is_event_online($event);
 
                 if (!$is_event_online) {
-                    echo  wp_kses_post(get_event_location());
+                    echo  wp_kses_post(wpem_get_event_location());
                 } else {
                     echo esc_attr('Online Event', 'wp-event-manager');
                 }
             } else if ($settings['event_field'] == 'event_venue_name') {
-                display_event_venue_name('', '', true, $event);
+                wpem_display_event_venue_name('', '', true, $event);
             } else if ($settings['event_field'] == 'event_address') {
-                display_event_address('', '', true, $event);
+                wpem_display_event_address('', '', true, $event);
             } else if ($settings['event_field'] == 'event_pincode') {
-                display_event_pincode('', '', true, $event);
+                wpem_display_event_pincode('', '', true, $event);
             } else if ($settings['event_field'] == 'event_location') {
-                display_event_location(true, $event);
+                wpem_display_event_location(true, $event);
             } else if ($settings['event_field'] == 'event_banner') {
-                display_event_banner('full', '', $event);
+                wpem_display_event_banner('full', '', $event);
             } else if ($settings['event_field'] == 'event_description') {
-                echo apply_filters('display_event_description', $event->post_content); 
+                echo wp_kses_post(
+                    apply_filters( 'wpem_display_event_description', $event->post_content )
+                );            
             } else if ($settings['event_field'] == 'registration') {
-                $registration_end_date = get_event_registration_end_date($event);
+                $registration_end_date = wpem_get_event_registration_end_date($event);
                 $registration_end_date = !empty($registration_end_date) ? $registration_end_date.' 23:59:59' : '';
              // check if timezone settings is enabled as each event then set current time stamp according to the timezone
             // for eg. if each event selected then Berlin timezone will be different then current site timezone.
             $current_timestamp = strtotime(current_time('Y-m-d H:i:s'));
 
-            if (!empty($registration_end_date) && strtotime($registration_end_date) < $current_timestamp)
-            {
-                    echo wp_kses_post('<div class="wpem-alert wpem-alert-warning">' . __('Event registration closed.', 'wp-event-manager') . '</div>');
-            }
-            else
-                get_event_manager_template('event-registration.php');
+            if (!empty($registration_end_date) && strtotime($registration_end_date) < $current_timestamp) {
+                echo wp_kses_post('<div class="wpem-alert wpem-alert-warning">' . __('Event registration closed.', 'wp-event-manager') . '</div>');
+            } else
+                wpem_get_event_manager_template('event-registration.php');
             } else if ($settings['event_field'] == 'event_start_date') {
-                display_event_start_date('', '', true, $event);
+                wpem_display_event_start_date('', '', true, $event);
             } else if ($settings['event_field'] == 'event_start_time') {
-                display_event_start_time('', '', true, $event);
+                wpem_display_event_start_time('', '', true, $event);
             } else if ($settings['event_field'] == 'event_end_date') {
-                display_event_end_date('', '', true, $event);
+                wpem_display_event_end_date('', '', true, $event);
             } else if ($settings['event_field'] == 'event_end_time') {
-                display_event_end_time('', '', true, $event);
+                wpem_display_event_end_time('', '', true, $event);
             } else if ($settings['event_field'] == 'event_timezone') {
-                display_event_timezone('', '', true, $event);
+                wpem_display_event_timezone('', '', true, $event);
             } else if ($settings['event_field'] == 'event_registration_deadline') {
-                display_event_registration_end_date('', '', true, $event);
+                wpem_display_event_registration_end_date('', '', true, $event);
             } else if ($settings['event_field'] == 'organizer_name') {
-                display_organizer_name('', '', true, $event);
+                wpem_display_organizer_name('', '', true, $event);
             } else if ($settings['event_field'] == 'organizer_logo') {
-                display_organizer_logo('full', '', $event);
+                wpem_display_organizer_logo('full', '', $event);
             } else if ($settings['event_field'] == 'organizer_description') {
-                echo  wp_kses_post(get_organizer_description($event));
+                echo  wp_kses_post(wpem_get_organizer_description($event));
             } else if ($settings['event_field'] == 'organizer_email') {
-                display_organizer_email('', '', true, $event);
+                wpem_display_organizer_email('', '', true, $event);
             } else if ($settings['event_field'] == 'event_organizer_ids') {
-                echo  wp_kses_post(get_organizer_name($event, true));
+                echo  wp_kses_post(wpem_get_organizer_name($event, true));
             } else if ($settings['event_field'] == 'organizer_website') {
-                display_organizer_website('', '', true, $event);
+                wpem_display_organizer_website('', '', true, $event);
             } else if ($settings['event_field'] == 'organizer_twitter') {
-                display_organizer_twitter('', '', true, $event);
+                wpem_display_organizer_twitter('', '', true, $event);
             } else if ($settings['event_field'] == 'organizer_youtube') {
-                display_organizer_youtube('', '', true, $event);
+                wpem_display_organizer_youtube('', '', true, $event);
             } else if ($settings['event_field'] == 'event_video_url') { ?>
-                <?php if (get_organizer_youtube($event)) : ?>
+                <?php if (wpem_get_organizer_youtube($event)) : ?>
                     <div class="clearfix">&nbsp;</div>
                     <button id="event-youtube-button" data-modal-id="wpem-youtube-modal-popup" class="wpem-theme-button wpem-modal-button"><?php esc_attr_e('Watch video', 'wp-event-manager'); ?></button>
                     <div id="wpem-youtube-modal-popup" class="wpem-modal" role="dialog" aria-labelledby="<?php esc_attr_e('Watch video', 'wp-event-manager'); ?>">
@@ -246,7 +246,20 @@ class Elementor_Event_Field extends Widget_Base {
                                 <div class="wpem-modal-header-close"><a href="javascript:void(0)" class="wpem-modal-close" id="wpem-modal-close">x</a></div>
                             </div>
                             <div class="wpem-modal-content">
-                                <?php echo wp_oembed_get(get_organizer_youtube(), array('autoplay' => 1, 'rel' => 0)); ?>
+                                <?php $youtube_url = wpem_get_organizer_youtube();
+                                if ( $youtube_url ) {
+                                    // Sanitize the URL first
+                                    $youtube_url = esc_url( $youtube_url );
+
+                                    // Get the embed HTML safely
+                                    $embed_html = wp_oembed_get( $youtube_url, array(
+                                        'autoplay' => 1,
+                                        'rel'      => 0,
+                                    ) );
+
+                                    // Escape the embed HTML allowing safe tags only
+                                    echo wp_kses_post( $embed_html );
+                                } ?>
                             </div>
                         </div>
                         <a href="#"><div class="wpem-modal-overlay"></div></a>
@@ -278,52 +291,49 @@ class Elementor_Event_Field extends Widget_Base {
                 <?php endif; ?>
                 <?php
             } else if ($settings['event_field'] == 'organizer_facebook') {
-                display_organizer_facebook('', '', true, $event);
+                wpem_display_organizer_facebook('', '', true, $event);
             } else if ($settings['event_field'] == 'view_count') {
-                $view_count = get_post_views_count($event);
+                $view_count = wpem_get_post_views_count($event);
 
-                if ($view_count) :
-                    ?>
+                if ($view_count) : ?>
                     <i class="wpem-icon-eye"></i> <?php echo esc_html($view_count); ?>
                     <?php
                 endif;
             } else if ($settings['event_field'] == 'event_ticket_type') {
-                if (get_event_ticket_option($event)) :
-                    ?>
+                if (wpem_get_event_ticket_option($event)) : ?>
                     <div class="wpem-event-ticket-type" class="wpem-event-ticket-type-text">
-                        <span class="wpem-event-ticket-type-text"><?php display_event_ticket_option('', '', true, $event); ?></span>
+                        <span class="wpem-event-ticket-type-text"><?php wpem_display_event_ticket_option('', '', true, $event); ?></span>
                     </div>
                     <?php
                 endif;
             } else if ($settings['event_field'] == 'event_category') {
-                display_event_category($event);
+                wpem_display_event_category($event);
             } else if ($settings['event_field'] == 'event_registration_deadline') {
-                if (get_event_registration_end_date($event)) {
-                    display_event_registration_end_date($event);
+                if (wpem_get_event_registration_end_date($event)) {
+                    wpem_display_event_registration_end_date($event);
                 }
-            } else if ($settings['event_field'] == 'event_share') {
-                ?>
+            } else if ($settings['event_field'] == 'event_share') { ?>
                 <div class="wpem-share-this-event">
                     <div class="wpem-event-share-lists">
                         <?php do_action('single_event_listing_social_share_start'); ?>
                         <div class="wpem-social-icon wpem-facebook">
-                            <a href="https://www.facebook.com/sharer/sharer.php?u=<?php display_event_permalink($event); ?>"
+                            <a href="https://www.facebook.com/sharer/sharer.php?u=<?php wpem_display_event_permalink($event); ?>"
                                title="Share this page on Facebook">Facebook</a>
                         </div>
                         <div class="wpem-social-icon wpem-twitter">
-                            <a href="https://twitter.com/share?text=twitter&url=<?php display_event_permalink($event); ?>"
+                            <a href="https://twitter.com/share?text=twitter&url=<?php wpem_display_event_permalink($event); ?>"
                                title="Share this page on Twitter">Twitter</a>
                         </div>
                         <div class="wpem-social-icon wpem-linkedin">
-                            <a href="https://www.linkedin.com/sharing/share-offsite/?&url=<?php display_event_permalink($event); ?>"
+                            <a href="https://www.linkedin.com/sharing/share-offsite/?&url=<?php wpem_display_event_permalink($event); ?>"
                                title="Share this page on Linkedin">Linkedin</a>
                         </div>
                         <div class="wpem-social-icon wpem-xing">
-                            <a href="https://www.xing.com/spi/shares/new?url=<?php display_event_permalink($event); ?>"
+                            <a href="https://www.xing.com/spi/shares/new?url=<?php wpem_display_event_permalink($event); ?>"
                                title="Share this page on Xing">Xing</a>
                         </div>
                         <div class="wpem-social-icon wpem-pinterest">
-                            <a href="https://pinterest.com/pin/create/button/?url=<?php display_event_permalink($event); ?>"
+                            <a href="https://pinterest.com/pin/create/button/?url=<?php wpem_display_event_permalink($event); ?>"
                                title="Share this page on Pinterest">Pinterest</a>
                         </div>
                         <?php do_action('single_event_listing_social_share_end'); ?>
@@ -331,7 +341,7 @@ class Elementor_Event_Field extends Widget_Base {
                 </div>
                 <?php
             } else if ($settings['event_field'] == 'event_venue_ids') {
-                echo  wp_kses_post(get_event_venue_name($event, true));
+                echo  wp_kses_post(wpem_get_event_venue_name($event, true));
             } else {
                 $event_field = get_post_meta($post_id, '_' . $settings['event_field'], true);
                 if (!empty($event_field)) {
@@ -360,10 +370,10 @@ class Elementor_Event_Field extends Widget_Base {
                                         </div>
                                         <?php
                                     } else {
-                                        echo $event_field[$key];
+                                        echo wp_kses_post($event_field[$key]);
                                     }
                                 } else {
-                                    echo $event_field[$key];
+                                    echo wp_kses_post($event_field[$key]);
                                 } ?>
                             </div>
                             <?php
@@ -409,15 +419,15 @@ class Elementor_Event_Field extends Widget_Base {
                         }elseif($event_field == 'specific_time'){
                             esc_attr_e('specific day','wp-event-manager') ;    
                         }else{
-                            echo $event_field;
+                            echo wp_kses_post($event_field);
                         }
                     }
                 }
             }
         } else {
-            display_event_title($event);
+            wpem_display_event_title($event);
         }
-       echo $settings['event_field_after_html'];
+       echo wp_kses_post($settings['event_field_after_html']);
     }
     /**
      * Render the widget output in the edit

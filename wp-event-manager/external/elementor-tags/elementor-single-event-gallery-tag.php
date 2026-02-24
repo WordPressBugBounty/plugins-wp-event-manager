@@ -110,7 +110,7 @@ class Elementor_Event_Gallery_Tag extends Data_Tag {
 		{
 			if($event_gallery_tag == 'event_banner')
 			{
-				$arrImage = get_event_banner($event);
+				$arrImage = wpem_get_event_banner($event);
 
 				if(!empty($arrImage))
 				{
@@ -148,12 +148,12 @@ class Elementor_Event_Gallery_Tag extends Data_Tag {
 
 		$arrOption = [];
 
-		if(!class_exists('WP_Event_Manager_Form_Submit_Event') ) {
+		if(!class_exists('WPEM_Event_Manager_Form_Submit_Event') ) {
 			include_once( EVENT_MANAGER_PLUGIN_DIR . '/forms/wp-event-manager-form-abstract.php' );
 			include_once( EVENT_MANAGER_PLUGIN_DIR . '/forms/wp-event-manager-form-submit-event.php' );	
 		}
-		$form_submit_event_instance = call_user_func( array( 'WP_Event_Manager_Form_Submit_Event', 'instance' ) );
-		$fields = $form_submit_event_instance->merge_with_custom_fields('backend');
+		$form_submit_event_instance = call_user_func( array( 'WPEM_Event_Manager_Form_Submit_Event', 'instance' ) );
+		$fields = $form_submit_event_instance->wpem_merge_with_custom_fields('backend');
 
 		foreach($fields  as $group_key => $group_fields) {
 			if(in_array($group_key, ['event'])) {

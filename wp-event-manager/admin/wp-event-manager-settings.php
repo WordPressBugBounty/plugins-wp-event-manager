@@ -1,13 +1,12 @@
 <?php
-/*
-* This file use for settings at admin site for wp event manager plugin.
-*/
 if(!defined('ABSPATH')) {
 	exit; // Exit if accessed directly
 }
 
 /**
  * WP_Event_Manager_Settings class.
+ * This file use for settings at admin site for wp event manager plugin.
+ * 
  */
 class WP_Event_Manager_Settings{
 
@@ -50,7 +49,7 @@ class WP_Event_Manager_Settings{
 			'orderby'        => 'title',
 			'order'          => 'ASC',
 		);
-		$all_organizers = get_all_event_organizer('', $args);
+		$all_organizers = wpem_get_all_event_organizer('', $args);
 		$organizer_options_list = array('no_default' => __('No Default', 'wp-event-manager'));
 
 		if (!empty($all_organizers)) {
@@ -66,7 +65,7 @@ class WP_Event_Manager_Settings{
 			'orderby'        => 'title',
 			'order'          => 'ASC',
 		);
-		$all_venue = get_all_event_venue('', $args);
+		$all_venue = wpem_get_all_event_venue('', $args);
 		$venue_options = array('no_default' => __('No Default', 'wp-event-manager'));
 
 		if (!empty($all_venue)) {
@@ -158,7 +157,7 @@ class WP_Event_Manager_Settings{
 							'std'        => '0',  
 							'label'      => __('Hide Data from Guest Users', 'wp-event-manager'),
 							'cb_label'   => __('Hide sensitive event organizer data from non-logged-in(guest) users.', 'wp-event-manager'),
-							'desc'       => '',
+							'desc'       => '', 
 							'type'       => 'checkbox',
 							'attributes' => array(),
 						),
@@ -488,6 +487,24 @@ class WP_Event_Manager_Settings{
 							'type'    => 'multiselect',
 							'options' => $account_roles,
 						),
+						array(
+							'name'    => 'event_manager_hide_frontend_organizer',
+							'std'        => '0',
+							'label'      => __('Hide Organizer Submission', 'wp-event-manager'),
+							'cb_label'   => __('Hide add organizer field from frontend form submission', 'wp-event-manager'),
+							'desc'       => __('If enabled, add organizer option will be hide from frontend form.', 'wp-event-manager'),
+							'type'       => 'checkbox',
+							'attributes' => array(),
+						),
+						array(
+							'name'    => 'event_manager_hide_frontend_venue',
+							'std'        => '0',
+							'label'      => __('Hide Venue Submission', 'wp-event-manager'),
+							'cb_label'   => __('Hide add venue field from frontend form submission', 'wp-event-manager'),
+							'desc'       => __('If enabled, add venue option will be hide from frontend form.', 'wp-event-manager'),
+							'type'       => 'checkbox',
+							'attributes' => array(),
+						),
 						
 					),
 				),
@@ -670,9 +687,54 @@ class WP_Event_Manager_Settings{
 				if(isset($option['std'])) {
 					add_option($option['name'], $option['std']);
 				}
-				register_setting($this->settings_group, $option['name']);
+				$sanitize_callback = $this->get_sanitize_callback_for_option( $option );
+				$args = array();
+				if ( $sanitize_callback ) {
+					$args['sanitize_callback'] = $sanitize_callback;
+				}
+				register_setting( $this->settings_group, $option['name'], $args );
 			}
 		}
+	}
+
+	/**
+	 * This function is used to return sanitize function name
+	 * @since 3.3.0
+	 */
+	private function get_sanitize_callback_for_option( $option ) {
+		$type = isset( $option['type'] ) ? $option['type'] : '';
+
+		switch ( $type ) {
+			case 'checkbox':
+				return array( $this, 'sanitize_checkbox' );
+			case 'number':
+				return 'absint';
+			case 'email':
+				return 'sanitize_email';
+			case 'textarea':
+				return 'wp_kses_post';
+			case 'multiselect':
+				return array( $this, 'sanitize_multiselect' );
+			default:
+				return 'sanitize_text_field';
+		}
+	}
+
+	/**
+	 * This function will return value for check box
+	 */
+	public function sanitize_checkbox( $value ) {
+		return ! empty( $value ) ? '1' : '0';
+	}
+
+	/**
+	 * This function will sanitize multiselect values
+	 */
+	public function sanitize_multiselect( $value ) {
+		if ( is_array( $value ) ) {
+			return array_map( 'sanitize_text_field', $value );
+		}
+		return array();
 	}
 
 	/**
@@ -684,8 +746,14 @@ class WP_Event_Manager_Settings{
 	public function output() {
 		wp_enqueue_script('wp-event-manager-multiselect'); 
 		wp_register_script( 'chosen', EVENT_MANAGER_PLUGIN_URL . '/assets/js/jquery-chosen/chosen.jquery.min.js', array( 'jquery' ), '1.1.0', true );
+		wp_localize_script('chosen', 'wpem_chosen', array(
+				'multiple_text' => __('Select Some Options', 'wp-event-manager'),
+				'single_text' => __('Select an Option', 'wp-event-manager'),
+				'no_result_text' => __('No results match', 'wp-event-manager'),
+			));
+		wp_enqueue_script('chosen');	
 		wp_register_script( 'wp-event-manager-multiselect', EVENT_MANAGER_PLUGIN_URL . '/assets/js/multiselect.min.js', array( 'jquery', 'chosen' ), EVENT_MANAGER_VERSION, true );
-		wp_enqueue_style( 'chosen', EVENT_MANAGER_PLUGIN_URL . '/assets/css/chosen.css' );
+		wp_enqueue_style( 'chosen', EVENT_MANAGER_PLUGIN_URL . '/assets/css/chosen.css', array(), '1.0.0' );
 		$this->init_settings(); ?>
 
 		<div class="wrap event-manager-settings-wrap">
@@ -694,7 +762,9 @@ class WP_Event_Manager_Settings{
 			</h1>
 			<div class="wpem-wrap event-manager-settings-wrap">
 				<form method="post" name="event-manager-settings-form" action="options.php">
-					<?php settings_fields($this->settings_group); ?>
+					<?php 
+					settings_fields($this->settings_group);
+					?>
 					<h2 class="nav-tab-wrapper">
 						<?php
 						foreach ($this->settings as $key => $section) {
@@ -703,7 +773,8 @@ class WP_Event_Manager_Settings{
 					</h2>
 					<div class="admin-setting-left">
 						<div class="white-background">
-							<?php if(!empty($_GET['settings-updated'])) {
+							<?php 
+							if(isset($_GET['settings-updated']) && $_GET['settings-updated'] === 'true') {
 								flush_rewrite_rules();
 								echo wp_kses_post('<div class="updated fade event-manager-updated"><p>' . esc_attr__('Settings successfully saved', 'wp-event-manager') . '</p></div>');
 							}
@@ -724,7 +795,7 @@ class WP_Event_Manager_Settings{
 									echo wp_kses_post('<tr valign="top" class="' . esc_attr($class) . '"><th scope="row"><label for="setting-' . esc_attr($option['name']) . '">' . esc_attr($option['label']) . '</a></th><td>');
 									switch ($option['type']) {
 										case 'checkbox':?>
-											<label><input id="setting-<?php echo esc_attr($option['name']); ?>" name="<?php echo esc_attr($option['name']); ?>" type="checkbox" value="1" <?php echo esc_attr( implode(' ', $attributes)); ?> <?php checked('1', $value); ?> /> <?php echo esc_attr($option['cb_label']); ?></label>
+											<label><input id="setting-<?php echo esc_attr($option['name']); ?>" name="<?php echo esc_attr($option['name']); ?>" type="checkbox" value="1" <?php echo esc_attr( implode(' ', $attributes)); ?> <?php checked('1', $value); ?> /> <?php echo esc_attr($option['cb_label']); ?></label> 
 											<?php
 											if($option['desc']) {
 												echo wp_kses_post(' <p class="description">' . $option['desc'] . '</p>');
@@ -786,16 +857,39 @@ class WP_Event_Manager_Settings{
 											<?php
 											break;
 										case 'page':
-											$args = array(
-												'name'        => $option['name'],
-												'id'          => $option['name'],
-												'sort_column' => 'menu_order',
-												'sort_order'  => 'ASC',
-												'show_option_none' => __('--no page--', 'wp-event-manager'),
-												'echo'        => false,
-												'selected'    => absint($value),
+											$dropdown = wp_dropdown_pages(
+												array(
+													'name'        => esc_attr($option['name']),
+													'id'          => esc_attr($option['name']),
+													'sort_column' => 'menu_order',
+													'sort_order'  => 'ASC',
+													'show_option_none' => esc_html__('--no page--', 'wp-event-manager'),
+													'echo'        => false,
+													'selected'    => absint($value),
+												)
 											);
-											echo str_replace(' id=', " data-placeholder='" . esc_attr('Select a page&hellip;', 'wp-event-manager') . "' id=", wp_dropdown_pages($args));
+
+											$placeholder = esc_attr__( 'Select a page…', 'wp-event-manager' );
+											$dropdown    = str_replace( ' id=', " data-placeholder='{$placeholder}' id=", $dropdown );
+
+											echo wp_kses(
+												$dropdown,
+												array(
+													'select'   => array(
+														'name'             => true,
+														'id'               => true,
+														'data-placeholder' => true,
+														'class'            => true,
+													),
+													'option'   => array(
+														'value'    => true,
+														'selected' => true,
+													),
+													'optgroup' => array(
+														'label' => true,
+													),
+												)
+											);
 											if($option['desc']) {?>
 												<p class="description"><?php echo wp_kses_post($option['desc']);?></p>
 											<?php }
@@ -841,7 +935,7 @@ class WP_Event_Manager_Settings{
 											$this->create_multi_select_checkbox($option);
 											break;
 										default:
-											do_action('wp_event_manager_admin_field_' . $option['type'], $option, $attributes, $value, $placeholder);
+											do_action('wpem_event_manager_admin_field_' . $option['type'], $option, $attributes, $value, $placeholder);
 											break;
 									}?>
 									</td></tr>
@@ -850,7 +944,7 @@ class WP_Event_Manager_Settings{
 							<?php }?>
 						</div> <!-- .white-background- -->
 						<p class="submit">
-							<input type="submit" class="button-primary" id="save-changes" value="<?php esc_attr_e('Save Changes', 'wp-event-manager'); ?>" />
+							<?php submit_button(esc_attr__('Save Changes', 'wp-event-manager'), 'primary', 'submit', false); ?>
 						</p>
 					</div> <!-- .admin-setting-left -->
 				</form>
@@ -868,7 +962,7 @@ class WP_Event_Manager_Settings{
 								<div class="wpem-setup-help-center-block-content">
 									<div class="wpem-setup-help-center-block-heading"><?php esc_attr_e('Knowledge Base', 'wp-event-manager'); ?></div>
 									<div class="wpem-setup-help-center-block-desc"><?php esc_attr_e('Solve your queries by browsing our documentation.', 'wp-event-manager'); ?></div>
-									<a href="https://wp-eventmanager.com/knowledge-base" target="_blank" class="wpem-setup-help-center-block-link"><span class="wpem-setup-help-center-box-target-text"><?php esc_attr_e('Browse More', 'wp-event-manager'); ?> »</span></a>
+									<a href="<?php echo esc_url(get_option('wp_event_manager_store_url'));?>knowledge-base" target="_blank" class="wpem-setup-help-center-block-link"><span class="wpem-setup-help-center-box-target-text"><?php esc_attr_e('Browse More', 'wp-event-manager'); ?> »</span></a>
 								</div>
 							</div>
 							<div class="wpem-setup-help-center-block">
@@ -878,7 +972,7 @@ class WP_Event_Manager_Settings{
 								<div class="wpem-setup-help-center-block-content">
 									<div class="wpem-setup-help-center-block-heading"><?php esc_attr_e('FAQs', 'wp-event-manager'); ?></div>
 									<div class="wpem-setup-help-center-block-desc"><?php esc_attr_e('Explore through the frequently asked questions.', 'wp-event-manager'); ?></div>
-									<a href="https://wp-eventmanager.com/faqs" target="_blank" class="wpem-setup-help-center-block-link"><span class="wpem-setup-help-center-box-target-text"><?php esc_attr_e('Get Answers', 'wp-event-manager'); ?> »</span></a>
+									<a href="<?php echo esc_url(get_option('wp_event_manager_store_url'));?>faqs" target="_blank" class="wpem-setup-help-center-block-link"><span class="wpem-setup-help-center-box-target-text"><?php esc_attr_e('Get Answers', 'wp-event-manager'); ?> »</span></a>
 								</div>
 							</div>
 							<div class="wpem-setup-help-center-block">
@@ -892,7 +986,7 @@ class WP_Event_Manager_Settings{
 								</div>
 							</div>
 						</div>
-						<span class="light-grey"><?php esc_attr_e('Powered By', 'wp-event-manager'); ?></span> <a href="https://wp-eventmanager.com/" target="_blank"><img src="<?php echo esc_url(EVENT_MANAGER_PLUGIN_URL); ?>/assets/images/wpem-logo.svg" alt="WP Event Manager"></a>
+						<span class="light-grey"><?php esc_attr_e('Powered By', 'wp-event-manager'); ?></span> <a href="<?php echo esc_url(get_option('wp_event_manager_store_url'));?>" target="_blank"><img src="<?php echo esc_url(EVENT_MANAGER_PLUGIN_URL); ?>/assets/images/wpem-logo.svg" alt="WP Event Manager"></a>
 					</div>
 				</div>
 				<?php do_action('wpem_admin_seting_side_box_end'); ?>

@@ -1,4 +1,5 @@
 <?php
+ if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
 /**
  * Adds additional compatibility with All in One SEO Pack.
  *
@@ -12,7 +13,7 @@ function event_manager_aiosp_sitemap_filter_expired_events($posts) {
 		if ($post instanceof WP_Post && 'event_listing' !== $post->post_type) {
 			continue;
 		}
-		if (is_event_cancelled($post)) {
+		if (wpem_is_event_cancelled($post)) {
 			unset($posts[ $index ]);
 		}
 	}

@@ -1,12 +1,15 @@
 <?php
-if(!function_exists('get_event_listings')) :
+if ( ! defined( 'ABSPATH' ) ) {
+    exit; // Exit if accessed directly
+}
+if(!function_exists('wpem_get_event_listings')) :
 	/**
 	 * Queries event listings with certain criteria and returns them.
 	 *
 	 * @access public
 	 * @return WP_Query
 	 */
-	function get_event_listings($args = array()) {
+	function wpem_get_event_listings($args = array()) {
 
 		global $wpdb, $event_manager_keyword;
 		$args = wp_parse_args($args, array(
@@ -32,7 +35,7 @@ if(!function_exists('get_event_listings')) :
 		 * @param array $args Arguments used to retrieve event listings.
 		 * @since 1.5
 		 */
-		do_action('get_event_listings_init', $args);
+		do_action('wpem_', $args);
 		if(get_option('event_manager_hide_expired')) {
 			$post_status = 'publish';
 		} else {
@@ -46,7 +49,9 @@ if(!function_exists('get_event_listings')) :
 			'posts_per_page'         => intval($args['posts_per_page']),
 			'orderby'                => $args['orderby'],
 			'order'                  => $args['order'],
+			// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_tax_query -- Required for event taxonomy filtering
 			'tax_query'              => array(),
+			// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- Required for event meta filtering
 			'meta_query'             => array(),
 			'update_post_term_cache' => false,
 			'update_post_meta_cache' => false,
@@ -208,6 +213,7 @@ if(!function_exists('get_event_listings')) :
 		}
 
 		if('featured' === $args['orderby']) {
+			// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- Required for event meta filtering
 			$query_args['meta_query'] = array(
 				'relation' => 'AND',
 				'featured_clause' => array(
@@ -239,11 +245,13 @@ if(!function_exists('get_event_listings')) :
 		// If orderby meta key _event_start_date 
 		if('event_start_date' === $args['orderby']) {
 			$query_args['orderby'] ='meta_value';
+			// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Required for event ordering by start date
 			$query_args['meta_key'] ='_event_start_date';
 			$query_args['meta_type'] ='DATETIME';
 		}
 		// If orderby event_start_date and time  both
 		if('event_start_date_time' === $args['orderby']) {
+			// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- Required for event meta filtering
 			$query_args['meta_query'] = array(
 				'relation' => 'AND',
 				'event_start_date_clause' => array(
@@ -264,7 +272,7 @@ if(!function_exists('get_event_listings')) :
 		$event_manager_keyword = esc_attr($args['search_keywords']); 
 		if(!empty($event_manager_keyword) && strlen($event_manager_keyword) >= apply_filters('event_manager_get_listings_keyword_length_threshold', 2)) {
 			$query_args['s'] = $event_manager_keyword;
-			add_filter('posts_search', 'get_event_listings_keyword_search');
+			add_filter('posts_search', 'wpem_get_event_listings_keyword_search');
 		}
 	
 		$query_args = apply_filters('event_manager_get_listings', $query_args, $args);
@@ -276,6 +284,7 @@ if(!function_exists('get_event_listings')) :
 		if(empty($query_args['tax_query'])) {
 			unset($query_args['tax_query']);
 		} else {
+			// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_tax_query -- Required for event taxonomy filtering
 			$query_args['meta_query']['tax_query'] = array($query_args['tax_query']);
 			$query_args['meta_query']['relation'] = 'AND';
 			// $query_args['tax_query']['relation'] = 'AND';
@@ -284,13 +293,12 @@ if(!function_exists('get_event_listings')) :
 		if(function_exists('pll_current_language') && !empty($args['lang'])) {
 			$query_args['lang'] = $args['lang'];
 		}
-		// Filter args
-		$query_args = apply_filters('get_event_listings_query_args', $query_args, $args);
-		do_action('before_get_event_listings', $query_args, $args);
+		// Filter argsget_event_listings_result_args', $query_args, $args);
+		do_action('wpem_before_get_event_listings', $query_args, $args);
 		// Cache results.
-		if(apply_filters('get_event_listings_cache_results', true)) {
-			$to_hash         = wp_json_encode($query_args) . apply_filters('wpml_current_language', '');
-			$query_args_hash = 'em_' . md5($to_hash . EVENT_MANAGER_VERSION) . WP_Event_Manager_Cache_Helper::get_transient_version('get_event_listings');
+		if(apply_filters('wpem_get_event_listings_cache_results', true)) {
+			$to_hash         = wp_json_encode($query_args) . apply_filters('wpem_wpml_current_language', '');
+			$query_args_hash = 'em_' . md5($to_hash . EVENT_MANAGER_VERSION) . WP_Event_Manager_Cache_Helper::get_transient_version('wpem_get_event_listings');
 			
 			$result               = false;
 			$cached_query_results = true;
@@ -329,23 +337,24 @@ if(!function_exists('get_event_listings')) :
 			if($cached_query_results) {
 				// Random order is cached so shuffle them.
 				if('rand_featured' === $args['orderby']) {
-					usort($result->posts, '_wpem_shuffle_featured_post_results_helper');
+					usort($result->posts, 'wpem_shuffle_featured_post_results_helper');
 				} elseif('rand' === $args['orderby']) {
 					shuffle($result->posts);
 				}
 			}
 		} else {
+			// phpcs:ignore WordPressVIPMinimum.Performance.TaxQuery
 			$result = new WP_Query($query_args);
 		}
 	
-		$result = apply_filters('get_event_listings_result_args',$result,$query_args);
-		do_action('after_get_event_listings', $query_args, $args);
-		remove_filter('posts_search', 'get_event_listings_keyword_search');
+		$result = apply_filters('wpem_get_event_listings_result_args',$result,$query_args);
+		do_action('wpem_after_get_event_listings', $query_args, $args);
+		remove_filter('posts_search', 'wpem_get_event_listings_keyword_search');
 		return $result;
 	}
 endif;
 
-if(!function_exists('_wpem_shuffle_featured_post_results_helper')) :
+if(!function_exists('wpem_shuffle_featured_post_results_helper')) :
 	/**
 	 * Helper function to maintain featured status when shuffling results.
 	 *
@@ -354,7 +363,7 @@ if(!function_exists('_wpem_shuffle_featured_post_results_helper')) :
 	 *
 	 * @return bool
 	 */
-	function _wpem_shuffle_featured_post_results_helper($a, $b) {
+	function wpem_shuffle_featured_post_results_helper($a, $b) {
 		if(-1 === $a->menu_order || -1 === $b->menu_order) {
 			// Left is featured.
 			if(0 === $b->menu_order) {
@@ -365,11 +374,11 @@ if(!function_exists('_wpem_shuffle_featured_post_results_helper')) :
 				return 1;
 			}
 		}
-		return rand(-1, 1);
+		return wp_rand(-1, 1);
 	}
 endif;
 
-if(!function_exists('get_event_listings_keyword_search')) :
+if(!function_exists('wpem_get_event_listings_keyword_search')) :
 
 	/**
 	 * Join and where query for keywords
@@ -377,7 +386,7 @@ if(!function_exists('get_event_listings_keyword_search')) :
 	 * @param array $search
 	 * @return array
 	 */
-	function get_event_listings_keyword_search($search) {
+	function wpem_get_event_listings_keyword_search($search) {
 		
 		global $wpdb, $event_manager_keyword;
 		// Searchable Meta Keys: set to empty to search all meta keys
@@ -445,14 +454,14 @@ if(!function_exists('get_event_listings_keyword_search')) :
 	}
 endif;
 
-if(!function_exists('get_event_listing_post_statuses')) :
+if(!function_exists('wpem_get_event_listing_post_statuses')) :
 	/**
 	 * Get post statuses used for events.
 	 *
 	 * @access public
 	 * @return array
 	 */
-	function get_event_listing_post_statuses() {
+	function wpem_get_event_listing_post_statuses() {
 		return apply_filters('event_listing_post_statuses', array(
 			'draft'           => _x('Draft', 'post status', 'wp-event-manager'),
 			'expired'         => _x('Expired', 'post status', 'wp-event-manager'),
@@ -464,34 +473,41 @@ if(!function_exists('get_event_listing_post_statuses')) :
 	}
 endif;
 
-if(!function_exists('get_featured_event_ids')) :
+if(!function_exists('wpem_get_featured_event_ids')) :
 	/**
 	 * Gets the ids of featured events.
 	 *
 	 * @access public
 	 * @return array
 	 */
-	function get_featured_event_ids() {
+	function wpem_get_featured_event_ids() {
+		// phpcs:ignore WordPressVIPMinimum.Performance.TaxQuery
+		// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- Simple equality comparison, optimized query
 		return get_posts(array(
 			'posts_per_page' => -1,
 			'suppress_filters' => false,
 			'post_type'      => 'event_listing',
 			'post_status'    => 'publish',
-			'meta_key'       => '_featured',
-			'meta_value'     => '1',
+			'meta_query'     => array(
+				array(
+					'key'     => '_featured',
+					'value'   => '1',
+					'compare' => '=',
+				),
+			),
 			'fields'         => 'ids'
 		));
 	}
 endif;
 
-if(!function_exists('get_event_listing_types')) :
+if(!function_exists('wpem_get_event_listing_types')) :
 	/**
 	 * Get event listing types.
 	 *
 	 * @access public
 	 * @return array
 	 */
-	function get_event_listing_types($fields = 'all') {
+	function wpem_get_event_listing_types($fields = 'all') {
 
 		if(!get_option('event_manager_enable_event_types')){
 			return array();
@@ -502,7 +518,7 @@ if(!function_exists('get_event_listing_types')) :
 					'order'      => 'ASC',
 					'orderby'    => 'name'
 			);
-			$args = apply_filters('get_event_listing_types_args', $args);
+			$args = apply_filters('wpem_get_event_listing_types_args', $args);
 			// Prevent users from filtering the taxonomy
 			$args['taxonomy'] = 'event_listing_type';
 			return get_terms($args);
@@ -510,14 +526,14 @@ if(!function_exists('get_event_listing_types')) :
 	}
 endif;
 
-if(!function_exists('get_event_listing_categories')) :
+if(!function_exists('wpem_get_event_listing_categories')) :
 	/**
 	 * Get event categories.
 	 *
 	 * @access public
 	 * @return array
 	 */
-	function get_event_listing_categories() {
+	function wpem_get_event_listing_categories() {
 		if(!get_option('event_manager_enable_categories')) {
 			return array();
 		}
@@ -533,7 +549,7 @@ if(!function_exists('get_event_listing_categories')) :
 		 *
 		 * @param array $args
 		 */
-		$args = apply_filters('get_event_listing_category_args', $args);
+		$args = apply_filters('wpem_get_event_listing_category_args', $args);
 
 		// Prevent users from filtering the taxonomy.
 		$args['taxonomy'] = 'event_listing_category';
@@ -603,7 +619,7 @@ if(!function_exists('event_manager_get_filtered_links')) :
 			),
 			'rss_link' => array(
 				'name' => __('RSS', 'wp-event-manager'),
-				'url'  => get_event_listing_rss_link(apply_filters('event_manager_get_listings_custom_filter_rss_args', array(
+				'url'  => wpem_get_event_listing_rss_link(apply_filters('event_manager_get_listings_custom_filter_rss_args', array(
 					'search_keywords' => $args['search_keywords'],
 					'search_location' => $args['search_location'],	
 					'search_datetimes'  => implode(',', $search_datetimes),
@@ -631,14 +647,14 @@ if(!function_exists('event_manager_get_filtered_links')) :
 	}
 endif;
 
-if(!function_exists('get_event_listing_rss_link')) :
+if(!function_exists('wpem_get_event_listing_rss_link')) :
 
 	/**
 	 * Get the Event Listing RSS link.
 	 *
 	 * @return string
 	 */
-	function get_event_listing_rss_link($args = array()) {
+	function wpem_get_event_listing_rss_link($args = array()) {
 		$rss_link = add_query_arg(urlencode_deep(array_merge(array('feed' => 'event_feed'), $args)), home_url());
 		return $rss_link;
 	}
@@ -656,7 +672,7 @@ if(!function_exists('wp_event_manager_notify_new_user')) :
 		global $wp_version;
 		
 		if(version_compare($wp_version, '4.3.1', '<')) {
-			wp_new_user_notification($user_id, $password);
+			wp_new_user_notification( $user_id );
 		} else {
 			$notify = 'admin';
 			if(empty($password)) {
@@ -700,7 +716,7 @@ if(!function_exists('wp_event_manager_create_account')) :
 		}
 		
 		$username = sanitize_user($args['username'], true);
-		$email    = apply_filters('user_registration_email', sanitize_email($args['email']));
+		$email    = apply_filters('wpem_user_registration_email', sanitize_email($args['email']));
 		
 		if(empty($email)) {
 			return new WP_Error('validation-error', __('Invalid email address.', 'wp-event-manager'));
@@ -818,16 +834,62 @@ function event_manager_user_can_edit_event($event_id) {
 }
 
 /**
+ * True if the user can edit an organizer.
+ *
+ * @param int $organizer_id
+ * @return bool
+ */
+function event_manager_user_can_edit_organizer($organizer_id) {
+	$can_edit = true;
+	
+	if (!is_user_logged_in() || !$organizer_id) {
+		$can_edit = false;
+	} else {
+		$organizer = get_post($organizer_id);
+		if (!$organizer || $organizer->post_type !== 'event_organizer') {
+			$can_edit = false;
+		} elseif (absint($organizer->post_author) !== get_current_user_id() && !current_user_can('edit_post', $organizer_id)) {
+			$can_edit = false;
+		}
+	}
+	
+	return apply_filters('event_manager_user_can_edit_organizer', $can_edit, $organizer_id);
+}
+
+/**
+ * True if the user can edit a venue.
+ *
+ * @param int $venue_id
+ * @return bool
+ */
+function event_manager_user_can_edit_venue($venue_id) {
+	$can_edit = true;
+	
+	if (!is_user_logged_in() || !$venue_id) {
+		$can_edit = false;
+	} else {
+		$venue = get_post($venue_id);
+		if (!$venue || $venue->post_type !== 'event_venue') {
+			$can_edit = false;
+		} elseif (absint($venue->post_author) !== get_current_user_id() && !current_user_can('edit_post', $venue_id)) {
+			$can_edit = false;
+		}
+	}
+	
+	return apply_filters('event_manager_user_can_edit_venue', $can_edit, $venue_id);
+}
+
+/**
  * Checks if the visitor is currently on a WPEM page, event listing, or taxonomy.
  *
  * @return bool
  * @since 2.5
  */
-function is_wpem() {
+function wpem_is_wpem_word() {
 	/**
-	 * Filter the result of is_wpem().
+	 * Filter the result of wpem_is_wpem_word().
 	 */
-	return apply_filters('is_wpem', (is_wpem_page() || has_wpem_shortcode() || is_wpem_event_listing() || is_wpem_taxonomy()));
+	return apply_filters('wpem_is_wpem_word', (wpem_is_page() || wpem_has_shortcode() || wpem_is_event_listing() || wpem_is_taxonomy()));
 }
 
 /**
@@ -836,10 +898,10 @@ function is_wpem() {
  * @return bool
  * @since 2.5
  */
-function is_wpem_page() {
-	$is_wpem_page = is_post_type_archive('event_listing');
+function wpem_is_page() {
+	$wpem_is_page = is_post_type_archive('event_listing');
 
-	if(!$is_wpem_page) {
+	if(!$wpem_is_page) {
 		$wpem_page_ids = array_filter(
 			array(
 				get_option('event_manager_submit_event_form_page_id', false),
@@ -852,13 +914,13 @@ function is_wpem_page() {
 		 * Filters a list of all page IDs related to WPEM.
 		 */
 		$wpem_page_ids = array_unique(apply_filters('event_manager_page_ids', $wpem_page_ids));
-		$is_wpem_page = is_page($wpem_page_ids);
+		$wpem_is_page = is_page($wpem_page_ids);
 	}
 
 	/**
-	 * Filter the result of is_wpem_page().
+	 * Filter the result of wpem_is_page().
 	 */
-	return apply_filters('is_wpem_page', $is_wpem_page);
+	return apply_filters('wpem_is_page', $wpem_is_page);
 }
 
 /**
@@ -869,10 +931,10 @@ function is_wpem_page() {
  *
  * @return bool
  */
-function has_wpem_shortcode($content = null, $tag = null) {
+function wpem_has_shortcode($content = null, $tag = null) {
 	global $post;
 
-	$has_wpem_shortcode = false;
+	$wpem_has_shortcode = false;
 
 	if(null === $content && is_singular() && is_a($post, 'WP_Post')) {
 		$content = $post->post_content;
@@ -897,20 +959,20 @@ function has_wpem_shortcode($content = null, $tag = null) {
 		}
 		foreach($wpem_shortcodes as $shortcode) {
 			if(has_shortcode($content, $shortcode)) {
-				$has_wpem_shortcode = true;
+				$wpem_has_shortcode = true;
 				break;
 			}
 		}
 	}
 
 	/**
-	 * Filter the result of has_wpem_shortcode().
+	 * Filter the result of wpem_has_shortcode().
 	 *
 	 * @since 2.5
 	 *
-	 * @param bool $has_wpem_shortcode
+	 * @param bool $wpem_has_shortcode
 	 */
-	return apply_filters('has_wpem_shortcode', $has_wpem_shortcode);
+	return apply_filters('wpem_has_shortcode', $wpem_has_shortcode);
 }
 
 /**
@@ -920,7 +982,7 @@ function has_wpem_shortcode($content = null, $tag = null) {
  *
  * @return bool
  */
-function is_wpem_event_listing() {
+function wpem_is_event_listing() {
 	return is_singular(array('event_listing'));
 }
 
@@ -931,7 +993,7 @@ function is_wpem_event_listing() {
  *
  * @return bool
  */
-function is_wpem_taxonomy() {
+function wpem_is_taxonomy() {
 	return is_tax(get_object_taxonomies('event_listing'));
 }
 
@@ -942,13 +1004,13 @@ function is_wpem_taxonomy() {
  */
 function event_manager_multiselect_event_type() {
 
-	if(!class_exists('WP_Event_Manager_Form_Submit_Event')) {
+	if(!class_exists('WPEM_Event_Manager_Form_Submit_Event')) {
         include_once(EVENT_MANAGER_PLUGIN_DIR . '/forms/wp-event-manager-form-abstract.php');
         include_once(EVENT_MANAGER_PLUGIN_DIR . '/forms/wp-event-manager-form-submit-event.php');
     }
 
-    $form_submit_event_instance = call_user_func(array('WP_Event_Manager_Form_Submit_Event', 'instance'));
-    $event_fields = $form_submit_event_instance->merge_with_custom_fields();
+    $form_submit_event_instance = call_user_func(array('WPEM_Event_Manager_Form_Submit_Event', 'instance'));
+    $event_fields = $form_submit_event_instance->wpem_merge_with_custom_fields();
 
     if(isset($event_fields['event']['event_type']['type']) && $event_fields['event']['event_type']['type'] === 'term-multiselect') {
     	return apply_filters('event_manager_multiselect_event_type', true);
@@ -964,13 +1026,13 @@ function event_manager_multiselect_event_type() {
  */
 function event_manager_multiselect_event_category() {
 
-	if(!class_exists('WP_Event_Manager_Form_Submit_Event')) {
+	if(!class_exists('WPEM_Event_Manager_Form_Submit_Event')) {
         include_once(EVENT_MANAGER_PLUGIN_DIR . '/forms/wp-event-manager-form-abstract.php');
         include_once(EVENT_MANAGER_PLUGIN_DIR . '/forms/wp-event-manager-form-submit-event.php');
     }
 
-    $form_submit_event_instance = call_user_func(array('WP_Event_Manager_Form_Submit_Event', 'instance'));
-    $event_fields = $form_submit_event_instance->merge_with_custom_fields();
+    $form_submit_event_instance = call_user_func(array('WPEM_Event_Manager_Form_Submit_Event', 'instance'));
+    $event_fields = $form_submit_event_instance->wpem_merge_with_custom_fields();
 
     if(isset($event_fields['event']['event_category']['type']) && $event_fields['event']['event_category']['type'] === 'term-multiselect') {
     	return apply_filters('event_manager_multiselect_event_category', true);
@@ -1053,7 +1115,7 @@ function event_manager_dropdown_selection($args = '') {
 	}
 
     $nonce = wp_create_nonce('event_manager_dropdown_selection');
-    if (!wp_verify_nonce($nonce, 'event_manager_dropdown_selection')) {
+    if (!wp_verify_nonce(sanitize_text_field(wp_unslash($nonce)), 'event_manager_dropdown_selection')) {
         return;
     }
     $query = wp_parse_args($args, $defaults);
@@ -1068,14 +1130,15 @@ function event_manager_dropdown_selection($args = '') {
 	$categories      = get_transient($categories_hash);
 
 	if(empty($categories)) {
-		$categories = get_terms($taxonomy, array(
+		$categories = get_terms([
+			'taxonomy' => $taxonomy,
 			'orderby'         => $query['orderby'],
 			'order'           => $query['order'],
 			'hide_empty'      => $query['hide_empty'],
 			'child_of'        => $query['child_of'],
 			'exclude'         => $query['exclude'],
 			'hierarchical'    => $query['hierarchical']
-		));
+		]);
  
 		set_transient($categories_hash, $categories, DAY_IN_SECONDS * 30);
 	}
@@ -1097,7 +1160,7 @@ function event_manager_dropdown_selection($args = '') {
 
 	if(!empty($categories)) {
 		include_once(EVENT_MANAGER_PLUGIN_DIR . '/includes/wp-event-manager-category-walker.php');
-		$walker = new WP_Event_Manager_Category_Walker;
+		$walker = new WPEM_Event_Manager_Category_Walker;
 		if($hierarchical) {
 			$depth = $query['depth'];  // Walk the full depth.
 		} else {
@@ -1109,7 +1172,25 @@ function event_manager_dropdown_selection($args = '') {
 	$output .= "</select>\n";
 
 	if($echo) {
-		printf('%s', $output);
+		echo wp_kses($output, array(
+			'select' => array(
+				'name' => true,
+				'id' => true,
+				'class' => true,
+				'multiple' => true,
+				'data-placeholder' => true,
+				'data-no_results_text' => true,
+				'data-multiple_text' => true
+			),
+			'option' => array(
+				'value' => true,
+				'selected' => true,
+				'class' => true
+			),
+			'optgroup' => array(
+				'label' => true
+			)
+		));
 	}
 	return $output;
 }
@@ -1122,7 +1203,7 @@ function event_manager_dropdown_selection($args = '') {
 function event_manager_get_page_id($page){	
 	$page_id = get_option('event_manager_' . $page . '_page_id', false);
 	if($page_id) {
-		return apply_filters('wpml_object_id', absint(function_exists('pll_get_post') ? pll_get_post($page_id) : $page_id), 'page', TRUE);
+		return apply_filters('wpem_wpml_object_id', absint(function_exists('pll_get_post') ? pll_get_post($page_id) : $page_id), 'page', TRUE);
 	} else {
 		return 0;
 	}
@@ -1176,9 +1257,12 @@ add_filter('upload_dir', 'event_manager_upload_dir');
  * @return array
  */
 function event_manager_prepare_uploaded_files($file_data) {
-
 	$files_to_upload = array();
-	
+	// Bail early if file data is empty or not an array
+	if ( empty( $file_data ) || ! is_array( $file_data ) || empty( $file_data['name'] ) ) {
+		return $files_to_upload;
+	}
+
 	if(is_array($file_data['name'])) {
 		foreach($file_data['name'] as $file_data_key => $file_data_value) {
 			if($file_data['name'][$file_data_key]) {
@@ -1278,7 +1362,7 @@ function event_manager_upload_file($file, $args = array()) {
  * @param   string
  * @return  array
  */
-function get_duplicate_post_link($post_id) {
+function wpem_get_duplicate_post_link($post_id) {
 	if (!post_type_exists(get_post_type($post_id))) {
 		return '';
 	}
@@ -1321,25 +1405,24 @@ function event_manager_get_allowed_mime_types($field = ''){
  * @param  int $event_id
  * @return string
  */
-function get_event_expiry_date($event_id) {
+function wpem_get_event_expiry_date($event_id) {
 	//get set listing expiry time duration
-	$option=get_option('event_manager_submission_expire_options');
-	$event_start_date = esc_attr(get_post_meta($event_id, '_event_start_date', true));
-	$event_end_date = esc_attr(get_post_meta($event_id, '_event_end_date', true));
+	$option = get_option('event_manager_submission_expire_options');
+	$event_start_date = get_post_meta($event_id, '_event_start_date', true);
+	$event_end_date = get_post_meta($event_id, '_event_end_date', true);
 	$expiry_base_date = $event_end_date ? $event_end_date : $event_start_date;
 
 	if($option==='event_end_date')	{
 		if($expiry_base_date)
-			return date('Y-m-d', strtotime($expiry_base_date));
+			return gmdate('Y-m-d', strtotime($expiry_base_date));
 	} else {
 		// Get duration from the admin settings if set.
-		$duration = esc_attr(get_post_meta($event_id, '_event_duration', true));		
-
+		$duration = get_post_meta($event_id, '_event_duration', true);		
 		if(!$duration) {		   
 			$duration = absint(get_option('event_manager_submission_duration'));
 		}
 		if($duration) 
-			return date('Y-m-d', strtotime("+{$duration} days", strtotime($expiry_base_date)));
+			return gmdate('Y-m-d', strtotime("+{$duration} days", strtotime($expiry_base_date)));
 	}
 	return '';
 }
@@ -1378,9 +1461,9 @@ function event_manager_duplicate_listing($post_id) {
 	/**
 	 * Copy taxonomies.
 	 */
-	$taxonomies = get_object_taxonomies($post->post_type);
+	$wpem_taxonomies = get_object_taxonomies($post->post_type);
 
-	foreach($taxonomies as $taxonomy) {
+	foreach($wpem_taxonomies as $taxonomy) {
 		$post_terms = wp_get_object_terms($post_id, $taxonomy, array('fields' => 'slugs'));
 		wp_set_object_terms($new_post_id, $post_terms, $taxonomy, false);
 	}
@@ -1388,6 +1471,7 @@ function event_manager_duplicate_listing($post_id) {
 	/*
 	 * Duplicate post meta, aside from some reserved fields.
 	 */
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 	$post_meta = $wpdb->get_results($wpdb->prepare("SELECT meta_key, meta_value FROM {$wpdb->postmeta} WHERE post_id=%d", $post_id));
 
 	do_action('event_manager_duplicate_listing_meta_start', $post_meta, $post, $new_post_id);
@@ -1508,7 +1592,7 @@ function event_manager_get_password_rules_hint() {
  * @param null
  * @return string
  */
-function get_all_event_organizer($user_id = '', $args = []) {
+function wpem_get_all_event_organizer($user_id = '', $args = []) {
 	if(!get_option('enable_event_organizer'))
 		return false;
 
@@ -1528,7 +1612,7 @@ function get_all_event_organizer($user_id = '', $args = []) {
 		$query_args = array_merge($query_args,$args);
 	}
 
-	$query_args = apply_filters('get_all_event_organizer_args', $query_args);
+	$query_args = apply_filters('wpem_get_all_event_organizer_args', $query_args);
 
 	$all_organizer = get_posts($query_args);
 
@@ -1546,8 +1630,8 @@ function get_all_event_organizer($user_id = '', $args = []) {
  * @param null
  * @return string
  */
-function get_all_organizer_array($user_id = '', $args = []) {
-	$all_organizer =get_all_event_organizer($user_id, $args);
+function wpem_get_all_organizer_array($user_id = '', $args = []) {
+	$all_organizer = wpem_get_all_event_organizer($user_id, $args);
 
 	$organizer_array =array();
 
@@ -1566,8 +1650,8 @@ function get_all_organizer_array($user_id = '', $args = []) {
  * @return string
  * @since 3.1.14
  */
-function get_event_organizer_count($organizer_id = '') {
-	return sizeof(get_event_by_organizer_id($organizer_id));
+function wpem_get_event_organizer_count($organizer_id = '') {
+	return sizeof(wpem_get_event_by_organizer_id($organizer_id));
 }
 
 /**
@@ -1577,7 +1661,7 @@ function get_event_organizer_count($organizer_id = '') {
  * @return string
  * @since 3.1.14
  */
-function get_event_by_organizer_id($organizer_id = '') {
+function wpem_get_event_by_organizer_id($organizer_id = '') {
 	if(!get_option('enable_event_organizer'))
 		return false;
 
@@ -1606,7 +1690,7 @@ function get_event_by_organizer_id($organizer_id = '') {
  * @return string
  * @since 3.1.14
  */
-function get_all_event_venue($user_id = '', $args = []) {
+function wpem_get_all_event_venue($user_id = '', $args = []) {
 	if(!get_option('enable_event_venue'))
 		return false;
 
@@ -1625,7 +1709,7 @@ function get_all_event_venue($user_id = '', $args = []) {
 		$query_args = array_merge($query_args,$args);
 	}
 
-	$query_args = apply_filters('get_all_event_venue_args', $query_args);
+	$query_args = apply_filters('wpem_get_all_event_venue_args', $query_args);
 
 	$all_venue = get_posts($query_args);
 
@@ -1643,8 +1727,8 @@ function get_all_event_venue($user_id = '', $args = []) {
  * @return string
  * @since 3.1.14
  */
-function get_all_venue_array($user_id = '', $args = [], $blank_option = false) {
-	$all_venue =get_all_event_venue($user_id, $args);
+function wpem_get_all_venue_array($user_id = '', $args = [], $blank_option = false) {
+	$all_venue = wpem_get_all_event_venue($user_id, $args);
 	
 	$venue_array =array();
 
@@ -1669,8 +1753,8 @@ function get_all_venue_array($user_id = '', $args = [], $blank_option = false) {
  * @return string
  * @since 3.1.16
  */
-function get_event_venue_count($venue_id = '') {
-	return sizeof(get_event_by_venue_id($venue_id));
+function wpem_get_event_venue_count($venue_id = '') {
+	return sizeof(wpem_get_event_by_venue_id($venue_id));
 }
 
 /**
@@ -1680,7 +1764,7 @@ function get_event_venue_count($venue_id = '') {
  * @return string
  * @since 3.1.14
  */
-function get_event_by_venue_id($venue_id = '') {
+function wpem_get_event_by_venue_id($venue_id = '') {
 	if(!get_option('enable_event_venue'))
 		return false;
 	
@@ -1707,7 +1791,7 @@ function get_event_by_venue_id($venue_id = '') {
  * @param
  * @return
  **/
-function has_event_organizer_ids($post = null) {
+function wpem_has_event_organizer_ids($post = null) {
 	$post = get_post($post);
 
 	if($post->post_type !== 'event_listing')
@@ -1730,7 +1814,7 @@ function has_event_organizer_ids($post = null) {
  * 
  * @since 3.1.13
  **/
-function get_event_organizer_ids( $post = null ) {
+function wpem_get_event_organizer_ids( $post = null ) {
     $post = get_post( $post );
     if ( $post->post_type !== 'event_listing' ) {
         return;
@@ -1738,7 +1822,7 @@ function get_event_organizer_ids( $post = null ) {
     if ( class_exists('SitePress') && !empty($post->_event_organizer_ids) ) {
         foreach ($post->_event_organizer_ids as $key => $organizer_id ) {
             $result = $post->_event_organizer_ids;
-            $result[$key] = apply_filters( 'wpml_object_id', $organizer_id, 'event_organizer', TRUE  );
+            $result[$key] = apply_filters( 'wpem_wpml_object_id', $organizer_id, 'event_organizer', TRUE  );
         }
  
         return $result;
@@ -1751,7 +1835,7 @@ function get_event_organizer_ids( $post = null ) {
  * 
  * @since 3.1.15
  **/
-function check_organizer_exist($organizer_email) {
+function wpem_check_organizer_exist($organizer_email) {
 	$args = [
 			'post_type' 	=> 'event_organizer',
 			'post_status' 	=> ['publish'],
@@ -1765,7 +1849,9 @@ function check_organizer_exist($organizer_email) {
 	    ],
 	];
 
-	$args = apply_filters('check_organizer_exist_query_args', $args);
+	$args = apply_filters('wpem_check_organizer_exist_query_args', $args);
+	// phpcs:ignore WordPressVIPMinimum.Performance.TaxQuery
+	// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- Simple equality comparison, optimized query
 	$organizer = get_posts($args);
 
 	if(!empty($organizer) && isset($organizer[0]->ID)) {
@@ -1780,7 +1866,7 @@ function check_organizer_exist($organizer_email) {
  * 
  * @since 3.1.16
  **/
-function has_event_venue_ids($post = null) {
+function wpem_has_event_venue_ids($post = null) {
 	$post = get_post($post);
 
 	if($post->post_type !== 'event_listing')
@@ -1803,12 +1889,12 @@ function has_event_venue_ids($post = null) {
  * 
  * @since 3.1.16
  **/
-function get_event_venue_ids( $post = null ) {
+function wpem_get_event_venue_ids( $post = null ) {
     $post = get_post( $post );
     if ( $post->post_type !== 'event_listing' )
         return;
     if ( class_exists('SitePress') && !empty($post->_event_venue_ids) ) {
-        $result = apply_filters( 'wpml_object_id', $post->_event_venue_ids , 'event_listing', TRUE  );
+        $result = apply_filters( 'wpem_wpml_object_id', $post->_event_venue_ids , 'event_listing', TRUE  );
         return $result;
     }   
  
@@ -1821,7 +1907,7 @@ function get_event_venue_ids( $post = null ) {
  * @param null
  * @return array
  */
-function get_event_order_by() {
+function wpem_get_event_order_by() {
 	$args = [
 				'title'   => [
 					'label' => __('Event Title', 'wp-event-manager'),
@@ -1853,10 +1939,10 @@ function get_event_order_by() {
 				],
 			];
 
-	return apply_filters('get_event_order_by_args', $args);
+	return apply_filters('wpem_get_event_order_by_args', $args);
 }
 
-if(!function_exists('get_wpem_email_from_name')) {
+if(!function_exists('wpem_get_email_from_name')) {
 	/**
 	* Get the from name for outgoing emails.
 	*
@@ -1864,7 +1950,7 @@ if(!function_exists('get_wpem_email_from_name')) {
 	* @return string
 	* @since 3.1.35 
 	*/
-   function get_wpem_email_from_name($from_name = '') {
+   function wpem_get_email_from_name($from_name = '') {
 		$from_name = get_option('wpem_email_from_name');
 		if(empty($from_name))
 			$from_name = get_bloginfo('name');
@@ -1873,7 +1959,7 @@ if(!function_exists('get_wpem_email_from_name')) {
    }
 }
 
-if(!function_exists('get_wpem_email_from_address')){
+if(!function_exists('wpem_get_email_from_address')){
 	/**
 	 * Get the from address for outgoing emails.
 	 *
@@ -1881,7 +1967,7 @@ if(!function_exists('get_wpem_email_from_address')){
 	 * @return string
 	 * @since 3.1.35
 	 */
-	function get_wpem_email_from_address( $from_email = '' ) {
+	function wpem_get_email_from_address( $from_email = '' ) {
 		$from_email = get_option('wpem_email_from_address');
 		if(empty($from_email))
 			$from_email = 'noreply@' . (isset($_SERVER['HTTP_HOST']) ? str_replace('www.', '', esc_url_raw( wp_unslash($_SERVER['HTTP_HOST']))) : 'noreply.com');
@@ -1891,7 +1977,7 @@ if(!function_exists('get_wpem_email_from_address')){
 	}
 }
 
-if(!function_exists('get_wpem_email_headers')) {
+if(!function_exists('wpem_get_email_headers')) {
 	/**
 	 * Get email headers.
 	 *
@@ -1899,13 +1985,13 @@ if(!function_exists('get_wpem_email_headers')) {
 	 * @return string
 	 * @since 3.1.35
 	 */
-	function get_wpem_email_headers($post_id, $sender_name = '', $sender_address = '', $reply_name = '', $replay_address = '', $content_type = 'text/html; charset=UTF-8') {
+	function wpem_get_email_headers($post_id, $sender_name = '', $sender_address = '', $reply_name = '', $replay_address = '', $content_type = 'text/html; charset=UTF-8') {
 		$header[] = 'Content-Type: text/html; charset=UTF-8';
 
 		if (empty($sender_name)) 
-			$sender_name = get_wpem_email_from_name();
+			$sender_name = wpem_get_email_from_name();
 		if(empty($sender_address))
-			$sender_address = get_wpem_email_from_address();
+			$sender_address = wpem_get_email_from_address();
 
 		if (empty($reply_name)) 
 			$reply_name = $sender_name;
@@ -1914,7 +2000,7 @@ if(!function_exists('get_wpem_email_headers')) {
 		
 		$header[] = 'From: '.$sender_name.'<'.$sender_address.'>';
 		$header[] = 'Reply-to: ' . $reply_name . '<' . $replay_address . '>';
-		return apply_filters( 'change_wpem_default_email_headers', $header, $content_type, $sender_name, $sender_address, $post_id);
+		return apply_filters( 'wpem_change_default_email_headers', $header, $content_type, $sender_name, $sender_address, $post_id);
 	}
 }
 
@@ -1966,7 +2052,7 @@ function wpem_convert_php_to_moment_format($format) {
     return $momentFormat;
 }
 
-if ( !function_exists( 'get_event_by_user_id' ) ) {
+if ( !function_exists( 'wpem_get_event_by_user_id' ) ) {
     /**
      * This function is used to get event by user id.
      *
@@ -1975,7 +2061,7 @@ if ( !function_exists( 'get_event_by_user_id' ) ) {
      * @return array
      * @since 1.0.0
      */
-    function get_event_by_user_id( $user_id = '' ) {
+    function wpem_get_event_by_user_id( $user_id = '' ) {
         return get_posts( apply_filters('wpem_events_by_user_id_args', array( 
             'posts_per_page' => - 1,
             'post_type' => 'event_listing',
@@ -2253,7 +2339,7 @@ function wpem_get_all_countries() {
  * @return html
  */
 function wpem_embed_oembed_html($content) {
-	echo apply_filters('wpem_embed_oembed_custome', $content);
+	echo wp_kses_post(apply_filters('wpem_embed_oembed_custome', $content));
 }
 
 /**

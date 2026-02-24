@@ -1,14 +1,9 @@
 <?php
-/**
- * Shortcodes Page.
-*/
-
 if(!defined('ABSPATH')){
 	 exit;// Exit if accessed directly
 } 
 
 if(!class_exists('WP_Event_Manager_Shortcode_List')) :
-
 	/**
 	 * WP_Event_Manager_Shortcode_List Class
 	*/
@@ -23,15 +18,26 @@ if(!class_exists('WP_Event_Manager_Shortcode_List')) :
 			
 			$detail_link = esc_url("https://wp-eventmanager.com/knowledge-base/");
 
-			$shortcode_plugins = apply_filters('wp_event_manager_shortcode_plugin', 
+			$shortcode_plugins = apply_filters('wpem_event_manager_shortcode_plugin', 
 				array(
 					'wp-event-manager' => __('WP Event Manager', 'wp-event-manager')
 				)
 			);	
-			if(isset($_GET['plugin']) && !empty($_GET['plugin']))
-				$plugin_slug = esc_attr($_GET['plugin']);
-			else
-				$plugin_slug = esc_attr('wp-event-manager');
+			$plugin_slug                 = 'wp-event-manager';
+			$shortcode_list_nonce_action = 'wpem_shortcode_list_filter';
+			$shortcode_list_nonce_name   = 'wpem_shortcode_list_nonce';
+
+			if (
+				isset( $_GET['plugin'], $_GET[ '_wpnonce' ] )
+				&& ! empty( $_GET['plugin'] )
+				&& wp_verify_nonce(
+					sanitize_text_field( wp_unslash( $_GET[ '_wpnonce' ] ) ),
+					$shortcode_list_nonce_action
+				)
+			) {
+				$plugin_slug = sanitize_text_field( wp_unslash( $_GET['plugin'] ) );
+			}
+			$shortcode_list_nonce = wp_create_nonce( $shortcode_list_nonce_action );
 			?>
 			<style>
 				.<?php echo esc_attr($plugin_slug);?>{display:table-row;}
@@ -41,6 +47,7 @@ if(!class_exists('WP_Event_Manager_Shortcode_List')) :
 				<div class="wpem-shortcode-page">
 
 					<div class="wpem-shortcode-filters">
+						<input type="hidden" id="wpem_shortcode_list_nonce" name="<?php echo esc_attr( $shortcode_list_nonce_name ); ?>" value="<?php echo esc_attr( $shortcode_list_nonce ); ?>" />
 						<select name="wpem_shortcode_filter" id="wpem_shortcode_filter">
 							<option value=""><?php esc_attr_e('Select Plugin', 'wp-event-manager');?></option> 
 							<?php 
@@ -121,13 +128,13 @@ if(!class_exists('WP_Event_Manager_Shortcode_List')) :
 									<td><a class="button add-field" href="<?php echo esc_attr($detail_link).'organizer-shortcode/#articleTOC_2';?>" target="_blank"><?php esc_attr_e('View Details', 'wp-event-manager');?></a></td>
 								</tr>
 								<tr class="shortcode_list wp-event-manager">
-									<td class="wpem-shortcode-td">[event_organizer]</td>
+									<td class="wpem-shortcode-td">[event_organizer id="organizer_id"]</td>
 									<td><?php esc_attr_e('Event Organizer', 'wp-event-manager');?></td>
 									<td><?php esc_attr_e('In order to display a particular organizer on the page, a user can add this shortcode.', 'wp-event-manager');?></td>
 									<td><a class="button add-field" href="<?php echo esc_attr($detail_link).'organizer-shortcode/#articleTOC_4';?>" target="_blank"><?php esc_attr_e('View Details', 'wp-event-manager');?></a></td>
 								</tr>
 								<tr class="shortcode_list wp-event-manager">
-									<td class="wpem-shortcode-td">[single_event_organizer]</td>
+									<td class="wpem-shortcode-td">[single_event_organizer id="event_id"]</td>
 									<td><?php esc_attr_e('Single Event Organizers', 'wp-event-manager');?></td>
 									<td><?php esc_attr_e('In order to display a particular event’s Organizer, a user can add this shortcode.', 'wp-event-manager');?></td>
 									<td><a class="button add-field" href="<?php echo esc_attr($detail_link).'organizer-shortcode/#articleTOC_5';?>" target="_blank"><?php esc_attr_e('View Details', 'wp-event-manager');?></a></td>
@@ -152,18 +159,18 @@ if(!class_exists('WP_Event_Manager_Shortcode_List')) :
 									<td><a class="button add-field" href="<?php echo esc_attr($detail_link).'venue-shortcode/#articleTOC_2';?>" target="_blank"><?php esc_attr_e('View Details', 'wp-event-manager');?></a></td>
 								</tr>
 								<tr class="shortcode_list wp-event-manager">
-									<td class="wpem-shortcode-td">[event_venue]</td>
+									<td class="wpem-shortcode-td">[event_venue id="venue_id"]</td>
 									<td><?php esc_attr_e('Event Venue', 'wp-event-manager');?></td>
 									<td><?php esc_attr_e('In order to display a particular Venue on the page, a user can add this shortcode.', 'wp-event-manager');?></td>
 									<td><a class="button add-field" href="<?php echo esc_attr($detail_link).'venue-shortcode/#articleTOC_4';?>" target="_blank"><?php esc_attr_e('View Details', 'wp-event-manager');?></a></td>
 								</tr>
 								<tr class="shortcode_list wp-event-manager">
-									<td class="wpem-shortcode-td">[single_event_venue]</td>
+									<td class="wpem-shortcode-td">[single_event_venue id="event_id"]</td>
 									<td><?php esc_attr_e('Single Event Venues', 'wp-event-manager');?></td>
 									<td><?php esc_attr_e('In order to display a particular event’s Venue, a user can add this shortcode.', 'wp-event-manager');?></td>
 									<td><a class="button add-field" href="<?php echo esc_attr($detail_link).'venue-shortcode/#articleTOC_5';?>" target="_blank"><?php esc_attr_e('View Details', 'wp-event-manager');?></a></td>
 								</tr>
-								<?php do_action('wp_event_manager_shortcode_list', $detail_link); ?>
+								<?php do_action('wpem_event_manager_shortcode_list', $detail_link); ?>
 							</tbody>
 						</table>
 					</div>

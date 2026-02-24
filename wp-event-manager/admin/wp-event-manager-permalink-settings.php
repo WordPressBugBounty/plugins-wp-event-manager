@@ -8,7 +8,7 @@ if(!defined('ABSPATH')) {
  *
  * @since 2.5
  */
-class WP_Event_Manager_Permalink_Settings {
+class WPEM_Event_Manager_Permalink_Settings {
 	/**
 	 * The single instance of the class.
 	 *
@@ -106,20 +106,20 @@ class WP_Event_Manager_Permalink_Settings {
 		if(!is_admin()) {
 			return;
 		}
-		if(isset($_POST['permalink_structure'])) {
+		if(isset($_POST['permalink_structure']) && isset($_POST['_wpnonce']) && wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['_wpnonce'])), 'update-permalink')) {
 			if(function_exists('switch_to_locale')) {
 				switch_to_locale(get_locale());
 			}
 			$permalinks                  = (array) get_option('wpem_permalinks', array());
-			$permalinks['event_base']    = sanitize_title_with_dashes($_POST['wpem_event_base_slug']);
-			$permalinks['category_base'] = sanitize_title_with_dashes($_POST['wpem_event_category_slug']);
-			$permalinks['type_base']     = sanitize_title_with_dashes($_POST['wpem_event_type_slug']);
+			$permalinks['event_base']    = isset($_POST['wpem_event_base_slug']) ? sanitize_title_with_dashes(wp_unslash($_POST['wpem_event_base_slug'])) : '';
+			$permalinks['category_base'] = isset($_POST['wpem_event_category_slug']) ? sanitize_title_with_dashes(wp_unslash($_POST['wpem_event_category_slug'])) : '';
+			$permalinks['type_base']     = isset($_POST['wpem_event_type_slug']) ? sanitize_title_with_dashes(wp_unslash($_POST['wpem_event_type_slug'])) : '';
 			update_option('wpem_permalinks', $permalinks);
 			if(function_exists('restore_current_locale')) {
 				restore_current_locale();
 			}
 		}
-	}
+	}	
 }
 
-WP_Event_Manager_Permalink_Settings::instance();
+WPEM_Event_Manager_Permalink_Settings::instance();

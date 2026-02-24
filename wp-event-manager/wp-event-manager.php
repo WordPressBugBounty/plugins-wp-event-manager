@@ -7,9 +7,11 @@
 * Author URI: https://www.wp-eventmanager.com
 * Text Domain: wp-event-manager
 * Domain Path: /languages
-* Version: 3.2.2
+* Version: 3.3.3
 * Since: 1.0.0
-* Requires WordPress Version at least: 6.8.2
+* Requires at least: 6.5
+* Tested up to: 6.9
+* Requires PHP: 7.6
 * Copyright: 2019 WP Event Manager
 * License: GNU General Public License v3.0
 * License URI: http://www.gnu.org/licenses/gpl-3.0.html
@@ -21,15 +23,10 @@ if(!defined('ABSPATH')) {
 	exit;
 }
 
-// Include WPEM Plugin Updater Class
-if ( !class_exists( 'WPEM_Updater' ) ) {
-	include( 'autoupdater/wpem-updater.php' );
-}
-
 /**
  * A class that defines the main features of the WP event manager plugin.
  */
-class WP_Event_Manager extends WPEM_Updater {
+class WP_Event_Manager {
 
 	public $forms;
 	public $post_types;
@@ -48,7 +45,7 @@ class WP_Event_Manager extends WPEM_Updater {
 	 * @var plugin version
 	 * @since  3.1.33
 	 */
-	private static $wpem_verion = '3.2.2';
+	private static $wpem_verion = '3.3.3';
 
 
 	/**
@@ -130,23 +127,16 @@ class WP_Event_Manager extends WPEM_Updater {
 		add_action('after_switch_theme', array($this->post_types, 'register_post_types'), 11);
 		add_action('after_switch_theme', 'flush_rewrite_rules', 15);
 
-		add_action('after_setup_theme', array($this, 'load_plugin_textdomain'));
 		add_action('after_setup_theme', array($this, 'include_template_functions'), 11);
 
 		add_action('widgets_init', array($this, 'widgets_init'));
 		add_action('wp_enqueue_scripts', array($this, 'frontend_scripts'));
-
 		add_action('admin_init', array($this, 'updater'));
 		add_action('wp_logout', array($this, 'cleanup_event_posting_cookies'));
 		
 		// Defaults for core actions
 		add_action('event_manager_notify_new_user', 'wp_event_manager_notify_new_user', 10, 2);
 
-		if(is_admin()){
-			// Call updater for WPEM addons update
-			$this->init_updates( __FILE__ );
-		}
-		
 		// Duplicate the_content filter for Wp event Manager plugin
 		global $wp_embed;
 		add_filter('wpem_the_content', array($wp_embed, 'run_shortcode'), 8);
@@ -167,7 +157,6 @@ class WP_Event_Manager extends WPEM_Updater {
 	 * @since 1.0.0
 	 */
 	public function activate() {
-
 		WP_Event_Manager_Ajax::add_endpoint();
 		unregister_post_type('event_listing');
 		add_filter('pre_option_event_manager_enable_categories', '__return_true');
@@ -204,18 +193,7 @@ class WP_Event_Manager extends WPEM_Updater {
 			flush_rewrite_rules();
 		}
 	}
-
-	/**
-	 * Loads a plugin's translated strings.
-	 * @since 1.0.0
-	 */
-	public function load_plugin_textdomain() {
-		$domain = 'wp-event-manager';       
-        $locale = apply_filters('plugin_locale', get_locale(), $domain);
-		load_textdomain($domain, WP_LANG_DIR . "/wp-event-manager/".$domain."-" .$locale. ".mo");
-		load_plugin_textdomain($domain, false, dirname(plugin_basename(__FILE__)) . '/languages/');
-	}
-
+	
 	/**
 	 * Load the functions files for WP Event Manager.
 	 * @since 1.0.0
@@ -255,15 +233,21 @@ class WP_Event_Manager extends WPEM_Updater {
 		$ajax_filter_deps = array('jquery', 'jquery-deserialize');
 
 		$chosen_shortcodes   = array('submit_event_form', 'event_dashboard', 'events');
-		$chosen_used_on_page = has_wpem_shortcode(null, $chosen_shortcodes);
+		$chosen_used_on_page = wpem_has_shortcode(null, $chosen_shortcodes);
 
 		// jQuery Chosen - vendor
 		if(apply_filters('event_manager_chosen_enabled', $chosen_used_on_page)) {
 			wp_enqueue_script('wpem-dompurify', EVENT_MANAGER_PLUGIN_URL . '/assets/js/dom-purify/dompurify.min.js', [], '3.0.5', true);
 			wp_register_script('chosen', EVENT_MANAGER_PLUGIN_URL . '/assets/js/jquery-chosen/chosen.jquery.min.js', array('jquery'), '1.1.0', true);
+			wp_localize_script('chosen', 'wpem_chosen', array(
+				'multiple_text' => __('Select Some Options', 'wp-event-manager'),
+				'single_text' => __('Select an Option', 'wp-event-manager'),
+				'no_result_text' => __('No results match', 'wp-event-manager'),
+			));
+			wp_enqueue_script('chosen');
 			wp_register_script('wp-event-manager-term-multiselect', EVENT_MANAGER_PLUGIN_URL . '/assets/js/term-multiselect.min.js', array('jquery', 'chosen'), EVENT_MANAGER_VERSION, true);
 			wp_register_script('wp-event-manager-multiselect', EVENT_MANAGER_PLUGIN_URL . '/assets/js/multiselect.min.js', array('jquery', 'chosen'), EVENT_MANAGER_VERSION, true);
-			wp_enqueue_style('chosen', EVENT_MANAGER_PLUGIN_URL . '/assets/css/chosen.css');
+			wp_enqueue_style('chosen', EVENT_MANAGER_PLUGIN_URL . '/assets/css/chosen.css', array(), '1.0.0');
 			$ajax_filter_deps[] = 'chosen';
 		}
 	
@@ -275,11 +259,11 @@ class WP_Event_Manager extends WPEM_Updater {
 			wp_register_script('wp-event-manager-ajax-file-upload', EVENT_MANAGER_PLUGIN_URL . '/assets/js/ajax-file-upload.min.js', array('jquery', 'jquery-fileupload'), EVENT_MANAGER_VERSION, true);
 
 			ob_start();
-			get_event_manager_template('form-fields/uploaded-file-html.php', array('name' => '', 'value' => '', 'extension' => 'jpg'));
+			wpem_get_event_manager_template('form-fields/uploaded-file-html.php', array('name' => '', 'value' => '', 'extension' => 'jpg'));
 			$js_field_html_img = ob_get_clean();
 
 			ob_start();
-			get_event_manager_template('form-fields/uploaded-file-html.php', array('name' => '', 'value' => '', 'extension' => 'zip'));
+			wpem_get_event_manager_template('form-fields/uploaded-file-html.php', array('name' => '', 'value' => '', 'extension' => 'zip'));
 			$js_field_html = ob_get_clean();
 
 			wp_localize_script('wp-event-manager-ajax-file-upload', 'event_manager_ajax_file_upload', array(
@@ -296,7 +280,7 @@ class WP_Event_Manager extends WPEM_Updater {
 		// Common js
 		wp_register_script('wp-event-manager-common', EVENT_MANAGER_PLUGIN_URL . '/assets/js/common.min.js', array('jquery'), EVENT_MANAGER_VERSION, true);	
 		
-		wp_enqueue_style('wp-event-manager-frontend', EVENT_MANAGER_PLUGIN_URL . '/assets/css/frontend.min.css');
+		wp_enqueue_style('wp-event-manager-frontend', EVENT_MANAGER_PLUGIN_URL . '/assets/css/frontend.min.css', array(), '1.0.0');
 		wp_enqueue_script('wp-event-manager-common'); 		
 
 		// event submission forms and validation js
@@ -315,12 +299,12 @@ class WP_Event_Manager extends WPEM_Updater {
 		));		
 
 		// Lightpick Date range picker
-		wp_register_style('wp-event-manager-lightpick-datepicker-style', EVENT_MANAGER_PLUGIN_URL . '/assets/js/lightpick-datepicker/lightpick.css');
+		wp_register_style('wp-event-manager-lightpick-datepicker-style', EVENT_MANAGER_PLUGIN_URL . '/assets/js/lightpick-datepicker/lightpick.css', array(), '1.0.0');
 		wp_register_script('wp-event-manager-lightpick-datepicker', EVENT_MANAGER_PLUGIN_URL . '/assets/js/lightpick-datepicker/lightpick.js', array('jquery-ui-core', 'jquery-ui-button', 'jquery-ui-datepicker', 'jquery-ui-menu', 'jquery-ui-widget', 'moment') , EVENT_MANAGER_VERSION, true);
 
 		// jQuery UI date rang picker
-		wp_register_style('wp-event-manager-jquery-ui-daterangepicker', EVENT_MANAGER_PLUGIN_URL . '/assets/js/jquery-ui-daterangepicker/jquery.comiseo.daterangepicker.css');
-		wp_register_style('wp-event-manager-jquery-ui-daterangepicker-style', EVENT_MANAGER_PLUGIN_URL . '/assets/js/jquery-ui-daterangepicker/styles.css');
+		wp_register_style('wp-event-manager-jquery-ui-daterangepicker', EVENT_MANAGER_PLUGIN_URL . '/assets/js/jquery-ui-daterangepicker/jquery.comiseo.daterangepicker.css', array(), '1.0.0');
+		wp_register_style('wp-event-manager-jquery-ui-daterangepicker-style', EVENT_MANAGER_PLUGIN_URL . '/assets/js/jquery-ui-daterangepicker/styles.css', array(), '1.0.0');
 		wp_register_script('wp-event-manager-jquery-ui-daterangepicker', EVENT_MANAGER_PLUGIN_URL . '/assets/js/jquery-ui-daterangepicker/jquery.comiseo.daterangepicker.js', array('jquery-ui-core', 'jquery-ui-button', 'jquery-ui-datepicker', 'jquery-ui-menu', 'jquery-ui-widget', 'moment') , EVENT_MANAGER_VERSION, true);
 		
 		wp_register_script('wp-event-manager-content-event-listing', EVENT_MANAGER_PLUGIN_URL . '/assets/js/content-event-listing.min.js', array('jquery','wp-event-manager-common'), EVENT_MANAGER_VERSION, true);
@@ -346,6 +330,7 @@ class WP_Event_Manager extends WPEM_Updater {
 		wp_register_script('wp-event-manager-ajax-filters', EVENT_MANAGER_PLUGIN_URL . '/assets/js/event-ajax-filters.min.js', $ajax_filter_deps, EVENT_MANAGER_VERSION, true);
 		wp_localize_script('wp-event-manager-ajax-filters', 'event_manager_ajax_filters', array(
 			'ajax_url'                => $ajax_url,
+			'nonce'                   => wp_create_nonce('event_manager_ajax_filters_nonce'),
 			'is_rtl'                  => is_rtl() ? 1 : 0,
 			'lang'                    => apply_filters('wpem_lang', null) //defined('ICL_LANGUAGE_CODE') ? ICL_LANGUAGE_CODE : '', // WPML workaround until this is standardized			
 		));
@@ -394,17 +379,17 @@ class WP_Event_Manager extends WPEM_Updater {
 		// Use for registration
 	    wp_register_script('wp-event-manager-event-registration', EVENT_MANAGER_PLUGIN_URL . '/assets/js/event-registration.min.js', array('jquery'), EVENT_MANAGER_VERSION, true);
 
-		wp_enqueue_style('wp-event-manager-jquery-ui-css', EVENT_MANAGER_PLUGIN_URL . '/assets/js/jquery-ui/jquery-ui.css');	
+		wp_enqueue_style('wp-event-manager-jquery-ui-css', EVENT_MANAGER_PLUGIN_URL . '/assets/js/jquery-ui/jquery-ui.css', array(), '1.0.0');	
 		
-		wp_enqueue_style('wp-event-manager-jquery-timepicker-css', EVENT_MANAGER_PLUGIN_URL . '/assets/js/jquery-timepicker/jquery.timepicker.min.css');
+		wp_enqueue_style('wp-event-manager-jquery-timepicker-css', EVENT_MANAGER_PLUGIN_URL . '/assets/js/jquery-timepicker/jquery.timepicker.min.css', array(), '1.0.0');
 		wp_register_script('wp-event-manager-jquery-timepicker', EVENT_MANAGER_PLUGIN_URL. '/assets/js/jquery-timepicker/jquery.timepicker.min.js', array('jquery' ,'jquery-ui-core'), EVENT_MANAGER_VERSION, true);
 		wp_enqueue_script('wp-event-manager-jquery-timepicker');
 		
-		wp_register_script('wp-event-manager-slick-script', EVENT_MANAGER_PLUGIN_URL . '/assets/js/slick/slick.min.js', array('jquery'));
-		wp_register_style('wp-event-manager-slick-style', EVENT_MANAGER_PLUGIN_URL . '/assets/js/slick/slick.css' , array());
+		wp_register_script(	'wp-event-manager-slick-script', EVENT_MANAGER_PLUGIN_URL . '/assets/js/slick/slick.min.js',	array( 'jquery' ), '1.0.0', true);
+		wp_register_style('wp-event-manager-slick-style', EVENT_MANAGER_PLUGIN_URL . '/assets/js/slick/slick.css' , array(), '1.0.0');
 		
-		wp_register_style('wp-event-manager-grid-style', EVENT_MANAGER_PLUGIN_URL . '/assets/css/wpem-grid.min.css');
-		wp_register_style('wp-event-manager-font-style', EVENT_MANAGER_PLUGIN_URL . '/assets/fonts/style.css');
+		wp_register_style('wp-event-manager-grid-style', EVENT_MANAGER_PLUGIN_URL . '/assets/css/wpem-grid.min.css', array(), '1.0.0');
+		wp_register_style('wp-event-manager-font-style', EVENT_MANAGER_PLUGIN_URL . '/assets/fonts/style.css', array(), '1.0.0');
 				
 		wp_enqueue_style('wp-event-manager-grid-style');
 		wp_enqueue_style('wp-event-manager-font-style');
@@ -463,13 +448,11 @@ class WP_Event_Manager extends WPEM_Updater {
     		$allowed_roles = array_map('strtolower', $allowed_roles);
     		$user_roles    = array_map('strtolower', $current_user->roles);
     
-    		if (!in_array('administrator', $user_roles) && !array_intersect($allowed_roles, $user_roles)) {
-    			?>
+    		if (!in_array('administrator', $user_roles) && !array_intersect($allowed_roles, $user_roles)) { ?>
     			<p class="account-sign-in wpem-alert wpem-alert-info">
     				<?php esc_html_e('You do not have permission to manage this dashboard.', 'wp-event-manager'); ?>
     			</p>
-    			<?php
-    			exit;
+    			<?php exit;
     		}
     	}
     }
@@ -478,13 +461,13 @@ class WP_Event_Manager extends WPEM_Updater {
 /**
  * Create link on plugin page for event manager plugin settings.
  */
-function add_plugin_page_event_manager_settings_link($links) {
+function wpem_add_plugin_page_event_manager_settings_link($links) {
     $links[] = '<a href="' .
         admin_url('edit.php?post_type=event_listing&page=event-manager-settings') .
         '">' . __('Settings', 'wp-event-manager') . '</a>';
         return $links;
 }
-add_filter('plugin_action_links_'.plugin_basename(__FILE__), 'add_plugin_page_event_manager_settings_link');
+add_filter('plugin_action_links_'.plugin_basename(__FILE__), 'wpem_add_plugin_page_event_manager_settings_link');
 
 /**
  * Main instance of WP Event Manager.

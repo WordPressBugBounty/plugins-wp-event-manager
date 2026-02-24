@@ -1,14 +1,12 @@
 <?php
-/*
-* Main Admin functions class which responsible for the entire amdin functionality and scripts loaded and files.
-*
-*/
 if(!defined('ABSPATH')) {
 	exit; // Exit if accessed directly
 }
 
 /**
  * Class with Event admin side functionality.
+ * Main Admin functions class which responsible for the entire amdin functionality and scripts loaded and files.
+ * 
  */
 class WP_Event_Manager_Admin {
 	
@@ -44,6 +42,7 @@ class WP_Event_Manager_Admin {
 
 		// Ajax
 		add_action('wp_ajax_wpem_upgrade_database', array($this, 'wpem_upgrade_database'));
+		add_action( 'admin_init', array($this, 'wpem_add_missing_capabilities' ));
 	}
 
 		/**
@@ -86,18 +85,16 @@ class WP_Event_Manager_Admin {
 
 		global $wp_scripts;
 		$screen = get_current_screen();
+		if(in_array($screen->id, apply_filters('event_manager_admin_screen_ids', array('edit-event_listing', 'event_listing', 'event_listing_page_event-manager-settings', 'event_listing_page_event-manager-addons', 'event_listing_page_event-manager-upgrade-database', 'edit-event_organizer', 'event_organizer', 'edit-event_venue', 'event_venue', 'event_listing_page_event-manager-shortcodes', 'event_listing_page_event-manager-form-editor')))) {
 
-		// Main frontend style
-		wp_enqueue_style('event_manager_admin_css', EVENT_MANAGER_PLUGIN_URL . '/assets/css/backend.min.css');
-
-		if(in_array($screen->id, apply_filters('event_manager_admin_screen_ids', array('edit-event_listing', 'event_listing', 'event_listing_page_event-manager-settings', 'event_listing_page_event-manager-addons', 'event_listing_page_event-manager-upgrade-database', 'edit-event_organizer', 'event_organizer', 'edit-event_venue', 'event_venue')))) {
+			// Main backend style - only enqueue on plugin pages
+			wp_enqueue_style('event_manager_admin_css', EVENT_MANAGER_PLUGIN_URL . '/assets/css/backend.min.css', array(), '1.0.0');
 			$jquery_version = isset($wp_scripts->registered['jquery-ui-core']->ver) ? $wp_scripts->registered['jquery-ui-core']->ver : '1.9.2';
 
 			wp_enqueue_style('jquery-ui-style', EVENT_MANAGER_PLUGIN_URL . '/assets/js/jquery-ui/jquery-ui.min.css', array(), $jquery_version);
 			wp_register_script('jquery-tiptip', EVENT_MANAGER_PLUGIN_URL . '/assets/js/jquery-tiptip/jquery.tipTip.min.js', array('jquery'), EVENT_MANAGER_VERSION, true);
 			wp_register_script('wp-event-manager-admin-js', EVENT_MANAGER_PLUGIN_URL . '/assets/js/admin.min.js', array('jquery', 'jquery-tiptip', 'jquery-ui-core', 'jquery-ui-datepicker'), EVENT_MANAGER_VERSION, true);
 			wp_register_script('wp-event-manager-admin-addons-js', EVENT_MANAGER_PLUGIN_URL . '/assets/js/admin-addons.min.js', array('jquery', 'jquery-tiptip', 'jquery-ui-core', 'jquery-ui-datepicker'), EVENT_MANAGER_VERSION, true);
-
 
 			wp_localize_script(
 				'wp-event-manager-admin-js',
@@ -114,17 +111,22 @@ class WP_Event_Manager_Admin {
 				)
 			);
 			wp_enqueue_script('wp-event-manager-admin-js');
+
+			wp_register_script('wp-event-manager-admin-settings', EVENT_MANAGER_PLUGIN_URL . '/assets/js/admin-settings.min.js', array('jquery'), EVENT_MANAGER_VERSION, true);
+			wp_register_script('chosen', EVENT_MANAGER_PLUGIN_URL . '/assets/js/jquery-chosen/chosen.jquery.min.js', array('jquery'), '1.1.0', true);
+			wp_localize_script('wpem-chosen', 'wpem_chosen', array(
+					'multiple_text' => __('Select Some Options', 'wp-event-manager'),
+					'single_text' => __('Select an Option', 'wp-event-manager'),
+					'no_result_text' => __('No results match', 'wp-event-manager'),
+				));
+			wp_enqueue_script('chosen');
+			wp_enqueue_style('chosen', EVENT_MANAGER_PLUGIN_URL . '/assets/css/chosen.css', array(), '1.0.0');
+
+			wp_enqueue_style('wp-event-manager-jquery-timepicker-css', EVENT_MANAGER_PLUGIN_URL . '/assets/js/jquery-timepicker/jquery.timepicker.min.css', array(), '1.0.0');
+			wp_register_script('wp-event-manager-jquery-timepicker', EVENT_MANAGER_PLUGIN_URL . '/assets/js/jquery-timepicker/jquery.timepicker.min.js', array('jquery', 'jquery-ui-core'), EVENT_MANAGER_VERSION, true);
+			wp_enqueue_script('wp-event-manager-jquery-timepicker');
 		}
 		wp_enqueue_script('wpem-dompurify', EVENT_MANAGER_PLUGIN_URL . '/assets/js/dom-purify/dompurify.min.js', [], '3.0.5', true);
-		wp_register_script('wp-event-manager-admin-settings', EVENT_MANAGER_PLUGIN_URL . '/assets/js/admin-settings.min.js', array('jquery'), EVENT_MANAGER_VERSION, true);
-		wp_register_script('chosen', EVENT_MANAGER_PLUGIN_URL . '/assets/js/jquery-chosen/chosen.jquery.min.js', array('jquery'), '1.1.0', true);
-		wp_enqueue_script('chosen');
-		wp_enqueue_style('chosen', EVENT_MANAGER_PLUGIN_URL . '/assets/css/chosen.css');
-
-		wp_enqueue_style('wp-event-manager-jquery-timepicker-css', EVENT_MANAGER_PLUGIN_URL . '/assets/js/jquery-timepicker/jquery.timepicker.min.css');
-		wp_register_script('wp-event-manager-jquery-timepicker', EVENT_MANAGER_PLUGIN_URL . '/assets/js/jquery-timepicker/jquery.timepicker.min.js', array('jquery', 'jquery-ui-core'), EVENT_MANAGER_VERSION, true);
-		wp_enqueue_script('wp-event-manager-jquery-timepicker');
-		
 	}
 
 	/**
@@ -204,8 +206,8 @@ A prior Backup does no harm before updating the plugin!',
 		}
 
 		$GLOBALS['event_manager']->forms->get_form('submit-organizer', array());
-		$form_submit_organizer_instance = call_user_func(array('WP_Event_Manager_Form_Submit_Organizer', 'instance'));
-		$organizer_fields               = $form_submit_organizer_instance->merge_with_custom_fields('backend');
+		$form_submit_organizer_instance = call_user_func(array('WPEM_Event_Manager_Form_Submit_Organizer', 'instance'));
+		$organizer_fields               = $form_submit_organizer_instance->wpem_merge_with_custom_fields('backend');
 
 		if(!empty($organizer_fields) && isset($organizer_fields['organizer']) && !empty($organizer_fields['organizer'])) {
 			$args = array(
@@ -241,7 +243,7 @@ A prior Backup does no harm before updating the plugin!',
 	 * Migrate organizer from event meta.
 	 */
 	public function migrate_organizer_from_event_meta($event, $organizer_data)	{
-		$organizer_id = check_organizer_exist($organizer_data['organizer_email']);
+		$organizer_id = wpem_check_organizer_exist($organizer_data['organizer_email']);
 		if(!$organizer_id) {
 			$args = apply_filters(
 				'wpem_create_event_organizer_data',
@@ -273,7 +275,7 @@ A prior Backup does no harm before updating the plugin!',
 	 * Set banner image.
 	 */
 	public function banner_image_set_thumnail($event) {
-		$banner = get_event_banner($event);
+		$banner = wpem_get_event_banner($event);
 
 		if(is_array($banner)) {
 			$image_url = $banner[0];
@@ -287,7 +289,9 @@ A prior Backup does no harm before updating the plugin!',
 			$wp_attached_file = str_replace($baseurl, '', $image_url);
 
 			$args = array(
+				// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Required for attachment lookup
 				'meta_key'       => '_wp_attached_file',
+				// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- Required for attachment lookup
 				'meta_value'     => $wp_attached_file,
 				'post_type'      => 'attachment',
 				'posts_per_page' => 1,
@@ -329,10 +333,48 @@ A prior Backup does no harm before updating the plugin!',
 		if(!$installation || !$skip_intallation) { ?>
 			<div class="notice wp-event-manager-notice">
 				<div class="wp-event-manager-notice-logo"><span></span></div>
-				<div class="wp-event-manager-notice-message wp-wp-event-manager-fresh"><?php esc_attr_e('We\'ve noticed you\'ve been using <strong>WP Event Manager</strong> for some time now. we hope you love it! We\'d be thrilled if you could <strong><a href="https://wordpress.org/support/plugin/wp-event-manager/reviews/" target="_blank">give us a nice rating on WordPress.org!</a></strong> Don\'t forget to submit your site to <strong><a href="https://wp-eventmanager.com/showcase/" target="_blank">our showcase</a></strong> and generate more traffic from our site.', 'wp-event-manager'); ?></div>
+					<?php $store_url = trailingslashit( esc_url( get_option( 'wp_event_manager_store_url' ) ) ) . 'showcase/';
+
+					/* translators: 1: review link, 2: showcase link */
+					$message = __(
+						"We've noticed you've been using WP Event Manager for some time now. We hope you love it! We'd be thrilled if you could %1\$s. Don't forget to submit your site to %2\$s and generate more traffic from our site.",
+						'wp-event-manager'
+					);
+
+					$review_link = sprintf(
+						'<strong><a href="%s" target="_blank" rel="noopener noreferrer">%s</a></strong>',
+						esc_url( 'https://wordpress.org/support/plugin/wp-event-manager/reviews/' ),
+						esc_html__( 'give us a nice rating on WordPress.org!', 'wp-event-manager' )
+					);
+
+					$showcase_link = sprintf(
+						'<strong><a href="%s" target="_blank" rel="noopener noreferrer">%s</a></strong>',
+						esc_url( $store_url ),
+						esc_html__( 'our showcase', 'wp-event-manager' )
+					); ?>
+
+					<div class="wp-event-manager-notice-message wp-wp-event-manager-fresh">
+						<?php echo wp_kses(
+							sprintf(
+								$message,
+								$review_link,
+								$showcase_link
+							),
+							array(
+								'strong' => array(),
+								'a'      => array(
+									'href'   => true,
+									'target' => true,
+									'rel'    => true,
+								),
+							)
+						); ?>
+					</div>
+
+				</div>
 				<div class="wp-event-manager-notice-cta">
-					<a href="https://wp-eventmanager.com/plugins/" target="_blank" class="wp-event-manager-notice-act button-primary"><?php esc_attr_e('Run Setup', 'wp-event-manager'); ?></a>
-					<button class="wp-event-manager-notice-dismiss wp-event-manager-dismiss-welcome"><a href="<?php echo esc_url(add_query_arg('event-manager-main-admin-dismiss', '1')); ?>"><?php esc_attr_e('Dismiss', 'wp-event-manager'); ?></a></span></button>
+					<a href="<?php echo esc_url(get_option('wp_event_manager_store_url'));?>plugins/" target="_blank" class="wp-event-manager-notice-act button-primary"><?php esc_attr_e('Run Setup', 'wp-event-manager'); ?></a>
+					<button class="wp-event-manager-notice-dismiss wp-event-manager-dismiss-welcome"><a href="<?php echo esc_url(wp_nonce_url(add_query_arg('event-manager-main-admin-dismiss', '1'), 'wpem_dismiss_admin_notice')); ?>"><?php esc_attr_e('Dismiss', 'wp-event-manager'); ?></a></span></button>
 				</div>
 			</div>
 		<?php
@@ -359,7 +401,49 @@ A prior Backup does no harm before updating the plugin!',
 	 */
 	public function admin_init() {
 		if(isset( $_GET['event-manager-main-admin-dismiss']) && !empty($_GET['event-manager-main-admin-dismiss'])){
-			update_option('event_manager_rating_showcase_admin_notices_dismiss', 1);
+			if ( isset( $_GET['_wpnonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash($_GET['_wpnonce'])), 'wpem_dismiss_admin_notice' ) ) {
+				update_option('event_manager_rating_showcase_admin_notices_dismiss', 1);
+			}
+		}
+	}
+
+	/**
+	 * Ensure Administrator has Organizer & Venue capabilities (for WP Event Manager 3.2.1+).
+	 */
+	function wpem_add_missing_capabilities() {
+		$role = get_role('administrator');
+		if ( ! $role ) {
+			return;
+		}
+
+		// Organizer capabilities
+		$organizer_caps = array(
+			"edit_event_organizer", "read_event_organizer", "delete_event_organizer",
+			"edit_event_organizers", "edit_others_event_organizers", "publish_event_organizers",
+			"read_private_event_organizers", "delete_event_organizers",
+			"delete_private_event_organizers", "delete_published_event_organizers",
+			"delete_others_event_organizers", "edit_private_event_organizers",
+			"edit_published_event_organizers",
+		);
+
+		// Venue capabilities
+		$venue_caps = array(
+			"edit_event_venue", "read_event_venue", "delete_event_venue",
+			"edit_event_venues", "edit_others_event_venues", "publish_event_venues",
+			"read_private_event_venues", "delete_event_venues",
+			"delete_private_event_venues", "delete_published_event_venues",
+			"delete_others_event_venues", "edit_private_event_venues",
+			"edit_published_event_venues",
+		);
+
+		$caps = array_merge( $organizer_caps, $venue_caps );
+
+		if ( ! $role->has_cap( 'edit_event_organizers' ) || ! $role->has_cap( 'edit_event_venues' ) ) {
+			foreach ( $caps as $cap ) {
+				if ( ! $role->has_cap( $cap ) ) {
+					$role->add_cap( $cap );
+				}
+			}
 		}
 	}
 }

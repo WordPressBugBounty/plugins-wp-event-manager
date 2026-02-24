@@ -1,15 +1,18 @@
 <?php
+if ( ! defined( 'ABSPATH' ) ) {
+    exit; // Exit if accessed directly
+}
 include_once('wp-event-manager-form-submit-event.php');
 
 /**
- * WP_Event_Manager_Form_Edit_Event class.
+ * WPEM_Event_Manager_Form_Edit_Event class.
  */
-class WP_Event_Manager_Form_Edit_Event extends WP_Event_Manager_Form_Submit_Event {
+class WPEM_Event_Manager_Form_Edit_Event extends WPEM_Event_Manager_Form_Submit_Event {
 
 	public $form_name           = 'edit-event';
 	public $event_id;
 
-	/** @var WP_Event_Manager_Form_Edit_Event The single instance of the class */
+	/** @var WPEM_Event_Manager_Form_Edit_Event The single instance of the class */
 
 	protected static $_instance = null;
 
@@ -27,7 +30,8 @@ class WP_Event_Manager_Form_Edit_Event extends WP_Event_Manager_Form_Submit_Even
 	 * Constructor.
 	*/
 	public function __construct() {
-		$this->event_id = !empty($_REQUEST['event_id']) ? absint($_REQUEST[ 'event_id' ]) : 0;
+		$this->event_id = !empty($_REQUEST['event_id']) ? absint(wp_unslash($_REQUEST[ 'event_id' ])) : 0;
+		
 		if  (!event_manager_user_can_edit_event($this->event_id)) {
 			$this->event_id = 0;
 		}
@@ -56,7 +60,7 @@ class WP_Event_Manager_Form_Edit_Event extends WP_Event_Manager_Form_Submit_Even
 		// $this->init_fields(); We dont need to initialize with this function because of field edior
 		// Now field editor function will return all the fields 
 		// Get merged fields from db and default fields.
-		$this->merge_with_custom_fields('frontend');
+		$this->wpem_merge_with_custom_fields('frontend');
 		
 		// Get date and time setting defined in admin panel Event listing -> Settings -> Date & Time formatting
 		$datepicker_date_format 	= WP_Event_Manager_Date_Time::get_datepicker_format();
@@ -76,11 +80,15 @@ class WP_Event_Manager_Form_Edit_Event extends WP_Event_Manager_Form_Submit_Even
 					} elseif('event_start_date' === $key) {
 						$event_start_date = esc_html(get_post_meta($event->ID, '_' . $key, true));
         				// Convert date and time value into selected datepicker value
-						$this->fields[ $group_key ][ $key ]['value'] = date($php_date_format ,strtotime($event_start_date));
+						$this->fields[ $group_key ][ $key ]['value'] = gmdate($php_date_format ,strtotime($event_start_date));
 					} elseif('event_end_date' === $key) {
 						$event_end_date = esc_html(get_post_meta($event->ID, '_' . $key, true));
         				// Convert date and time value into selected datepicker value
-						$this->fields[ $group_key ][ $key ]['value'] = date($php_date_format ,strtotime($event_end_date));
+						$this->fields[ $group_key ][ $key ]['value'] = gmdate($php_date_format ,strtotime($event_end_date));
+					} elseif('event_organizer_ids' === $key) {
+						$this->fields[ $group_key ][ $key ]['value'] = get_post_meta($event->ID, '_' . $key, true);
+					} elseif('event_venue_ids' === $key) {
+						$this->fields[ $group_key ][ $key ]['value'] = get_post_meta($event->ID, '_' . $key, true);
 					} elseif(!empty($field['taxonomy'])) {
 						$this->fields[ $group_key ][ $key ]['value'] = wp_get_object_terms($event->ID, $field['taxonomy'], array('fields' => 'ids'));
 					} else {
@@ -89,7 +97,7 @@ class WP_Event_Manager_Form_Edit_Event extends WP_Event_Manager_Form_Submit_Even
 				}
 				if(!empty($field['type']) &&  $field['type'] == 'date'){
 					$event_date = esc_html(get_post_meta($event->ID, '_' . stripslashes($key), true));
-					$this->fields[ $group_key ][ $key ]['value'] = !empty($event_date) ? date($php_date_format ,strtotime($event_date)) :'';
+					$this->fields[ $group_key ][ $key ]['value'] = !empty($event_date) ? gmdate($php_date_format ,strtotime($event_date)) :'';
 				}
 				if(!empty($field['type']) &&  $field['type'] == 'button'){
 					if(isset($this->fields[ $group_key ][ $key ]['value']) && empty($this->fields[ $group_key ][ $key ]['value'])) {
@@ -101,13 +109,13 @@ class WP_Event_Manager_Form_Edit_Event extends WP_Event_Manager_Form_Submit_Even
 		
 		$this->fields = apply_filters('submit_event_form_fields_get_event_data', $this->fields, $event);
 		wp_enqueue_script('wp-event-manager-event-submission');
-		get_event_manager_template('event-submit.php', array(
+		wpem_get_event_manager_template('event-submit.php', array(
 			'form'               => esc_attr($this->form_name),
 			'event_id'           => esc_attr($this->get_event_id()),
 			'action'             => esc_url($this->get_action()),
 			'event_fields'       => $this->get_fields('event'),
-			'organizer_fields'   => $this->get_fields('organizer'),
-			'venue_fields'       => $this->get_fields('venue'),
+			'wpem_organizer_fields'   => $this->get_fields('organizer'),
+			'wpem_venue_fields'       => $this->get_fields('venue'),
 			'step'               => esc_attr($this->get_step()),
 			'submit_button_text' => __('Save changes', 'wp-event-manager')
 		));
@@ -120,6 +128,11 @@ class WP_Event_Manager_Form_Edit_Event extends WP_Event_Manager_Form_Submit_Even
 		if(empty($_POST['submit_event'])) {
 			return;
 		}
+		// Verify nonce before processing form data
+		if (!isset($_POST['_wpnonce']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['_wpnonce'])), 'edit-event_' . (isset($_POST['event_id']) ? absint($_POST['event_id']) : 0))) {
+			wp_die(esc_html__('Security check failed. Please try again.', 'wp-event-manager'));
+		}
+		
 		try {
 			// Get posted values
 			$values = $this->get_posted_fields();
@@ -128,6 +141,7 @@ class WP_Event_Manager_Form_Edit_Event extends WP_Event_Manager_Form_Submit_Even
 			if(is_wp_error(($return = $this->validate_fields($values)))) {
 				throw new Exception($return->get_error_message());
 			}
+			$this->event_id = isset($_POST['event_id']) ? absint(wp_unslash($_POST['event_id'])) : 0;
 			$event_title       = html_entity_decode( $values['event']['event_title'] );
 			$event_description = html_entity_decode( $values['event']['event_description'] );
 			$event_title       = wp_strip_all_tags( $event_title );

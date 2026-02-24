@@ -1,4 +1,7 @@
 <?php
+if ( ! defined( 'ABSPATH' ) ) {
+    exit; // Exit if accessed directly
+}
 /*
 * This file the functionality of ajax for event listing and file upload.
 */ 
@@ -42,6 +45,7 @@ class WP_Event_Manager_Ajax {
 		add_action('event_manager_ajax_get_listings', array($this, 'get_listings'));
 		add_action('event_manager_ajax_upload_file', array($this, 'upload_file'));
 		add_action('event_manager_ajax_load_more_upcoming_events', array($this, 'load_more_upcoming_events'));
+		add_action('event_manager_ajax_load_more_past_listings', array($this, 'load_more_past_events'));
 		add_action('event_manager_ajax_get_upcoming_listings', array($this, 'get_upcoming_listings'));
 
 		// BW compatible handlers
@@ -85,30 +89,49 @@ class WP_Event_Manager_Ajax {
 	}
 
 	/**
-	 * Check for WC Ajax request and fire action.
+	 * Handle AJAX requests for WP Event Manager.
+	 *
+	 * @since 1.0.0
 	 */
 	public static function do_em_ajax() {
 		global $wp_query;
-		if(!empty($_GET['em-ajax'])) {
-			 $wp_query->set('em-ajax', esc_attr($_GET['em-ajax']));
-		}
-
-   		if($action = $wp_query->get('em-ajax')) {
-   			if(!defined('DOING_AJAX')) {
-				define('DOING_AJAX', true);
+		
+		// Verify nonce for AJAX action
+		$ajax_action = '';
+		if ( ! empty( $_GET['em-ajax'] ) ) {
+			$nonce_verified = false;
+			if ( ! empty( $_GET['_wpnonce'] ) ) {
+				$nonce_verified = wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'event_manager_ajax' );
 			}
+			if ( $nonce_verified ) {
+				$ajax_action = sanitize_text_field(wp_unslash($_GET['em-ajax']));
+				$wp_query->set('em-ajax', $ajax_action);
+			}
+		}
+		$action = $wp_query->get( 'em-ajax' );
+   		if( $action ) {
 			// Not home - this is an ajax endpoint
 			$wp_query->is_home = false;
-   			do_action('event_manager_ajax_' . esc_attr($action));
-   			die();
+   			do_action('event_manager_ajax_' . sanitize_key($action));
+   			wp_die();
    		}
 	}
 
+	/**
+	 * Load more upcoming events
+	 */
 	function load_more_upcoming_events($atts) {
-		$paged = isset($_POST['value']) ? intval($_POST['value']) : 1;
-		$per_page = isset($_POST['per_page']) ? intval($_POST['per_page']) : esc_attr(get_option('event_manager_per_page'));
-		$orderby = isset($_POST['orderby']) ? sanitize_text_field($_POST['orderby']) : 'date';
-		$order = isset($_POST['order']) ? sanitize_text_field($_POST['order']) : 'DESC';
+		// Verify nonce for AJAX request
+		if ( ! isset( $_POST['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ) ), 'event_manager_ajax' ) ) {
+			wp_send_json_error(array('error' => 'Invalid nonce'));
+			return;
+		}
+		
+		$paged = isset($_POST['value']) ? absint(wp_unslash($_POST['value'])) : 1;
+		$per_page = isset($_POST['per_page']) ? absint(wp_unslash($_POST['per_page'])) : absint(get_option('event_manager_per_page'));
+		$allowed_orderby = array('date', 'title', 'featured', 'rand_featured', 'event_start_date', 'event_start_date_time');
+		$orderby = isset($_POST['orderby']) && in_array(sanitize_text_field(wp_unslash($_POST['orderby'])), $allowed_orderby, true) ? sanitize_text_field(wp_unslash($_POST['orderby'])) : 'date';
+		$order = isset($_POST['order']) && in_array(strtoupper(sanitize_text_field(wp_unslash($_POST['order']))), array('ASC', 'DESC'), true) ? strtoupper(sanitize_text_field(wp_unslash($_POST['order']))) : 'DESC';
 
 		$args = array(
 			'post_type'      => 'event_listing',
@@ -201,7 +224,7 @@ class WP_Event_Manager_Ajax {
 
 			while ($upcoming_events->have_posts()) {
 				$upcoming_events->the_post();
-				get_event_manager_template_part('content', 'past_event_listing');
+				wpem_get_event_manager_template_part('content', 'past_event_listing');
 			}
 
 			$events_html = ob_get_clean();
@@ -221,30 +244,82 @@ class WP_Event_Manager_Ajax {
 	}
 
 	/**
+	 * Load more past events
+	 */
+	public function load_more_past_events($atts) {
+		if ( ! isset( $_POST['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ) ), 'event_manager_ajax_filters_nonce' ) ) {
+			wp_send_json_error(array('error' => 'Invalid nonce'));
+			return;
+		} 
+		
+		$paged = isset($_POST['value']) ? absint(wp_unslash($_POST['value'])) : 1;
+		$per_page = isset($_POST['per_page']) ? absint(wp_unslash($_POST['per_page'])) : absint(get_option('event_manager_per_page'));
+		$allowed_orderby = array('date', 'title', 'featured', 'rand_featured', 'event_start_date', 'event_start_date_time');
+		$orderby = isset($_POST['orderby']) && in_array(sanitize_text_field(wp_unslash($_POST['orderby'])), $allowed_orderby, true) ? sanitize_text_field(wp_unslash($_POST['orderby'])) : 'date';
+		$order = isset($_POST['order']) && in_array(strtoupper(sanitize_text_field(wp_unslash($_POST['order']))), array('ASC', 'DESC'), true) ? strtoupper(sanitize_text_field(wp_unslash($_POST['order']))) : 'DESC';
+
+		$args = array(
+			'post_type'      => 'event_listing',
+			'post_status'    => array('expired'),
+			'posts_per_page' => $per_page,
+			'paged'          => $paged,
+			'order'          => 'DESC',
+			'orderby'        => 'meta_value',
+			'meta_key'       => '_event_start_date',
+			'meta_type'      => 'DATETIME',
+		);
+		
+		$past_events = new WP_Query($args);
+
+		if ($past_events->have_posts()) {
+			ob_start();
+
+			while ($past_events->have_posts()) {
+				$past_events->the_post();
+				wpem_get_event_manager_template_part('content', 'past_event_listing');
+			}
+
+			$events_html = ob_get_clean();
+			$no_more_events = $past_events->found_posts <= $paged * $per_page;
+
+			wp_send_json_success(array(
+				'events_html' => $events_html,
+				'no_more_events' => $no_more_events
+			));
+		} else {
+			wp_send_json_error(array(
+				'error' => __('No more events found.', 'wp-event-manager')
+			));
+		}
+
+		wp_reset_postdata();
+	}
+
+	/**
 	 * Get Upcoming Listings
 	 */
-	function get_upcoming_listings($atts) {
+	public function get_upcoming_listings($atts) {
 
-		$search_location = isset( $_POST['search_location'] ) ? sanitize_text_field( $_POST['search_location'] ) : '';
-		$search_categories = isset( $_POST[''] ) ? sanitize_text_field( $_POST['search_categories'] ) : '';
-		$event_manager_keyword = isset( $_POST['search_keywords'] ) ? sanitize_text_field( $_POST['search_keywords'] ) : '';
+		$search_location = isset( $_POST['search_location'] ) ? sanitize_text_field( wp_unslash( $_POST['search_location'] ) ) : '';
+		$search_categories = isset( $_POST['search_categories'] ) ? sanitize_text_field( wp_unslash( $_POST['search_categories'] ) ) : '';
+		$event_manager_keyword = isset( $_POST['search_keywords'] ) ? sanitize_text_field( wp_unslash( $_POST['search_keywords'] ) ) : '';
 		if( is_array( $search_categories ) ) {
 		$search_categories = array_filter( array_map( 'sanitize_text_field', array_map( 'stripslashes', $search_categories ) ) );
 		} else {
 			$search_categories = sanitize_text_field( stripslashes( $search_categories ) );
 			$search_categories = explode( ',', $search_categories );
 		}
-		$search_event_types = isset( $_POST['search_event_types'] ) ? sanitize_text_field( $_POST['search_event_types'] ) : '';
+		$search_event_types = isset( $_POST['search_event_types'] ) ? sanitize_text_field( wp_unslash( $_POST['search_event_types'] ) ) : '';
 		if( is_array( $search_event_types ) ) {
 			$search_event_types= array_filter( array_map( 'sanitize_text_field', array_map( 'stripslashes', $search_event_types) ) );
 		} else {
 			$search_event_types = sanitize_text_field( stripslashes( $search_event_types ) );
 			$search_event_types= explode( ',', $search_event_types );
 		}
-		$paged = isset($_POST['value']) ? intval($_POST['value']) : 1;
-		$per_page = isset($_POST['per_page']) ? intval($_POST['per_page']) : esc_attr(get_option('event_manager_per_page'));
-		$orderby = isset($_POST['orderby']) ? sanitize_text_field($_POST['orderby']) : 'date';
-		$order = isset($_POST['order']) ? sanitize_text_field($_POST['order']) : 'DESC';
+		$paged = isset($_POST['value']) ? intval( wp_unslash($_POST['value'])) : 1;
+		$per_page = isset($_POST['per_page']) ? intval(wp_unslash($_POST['per_page'])) : esc_attr(get_option('event_manager_per_page'));
+		$orderby = isset($_POST['orderby']) ? sanitize_text_field(wp_unslash($_POST['orderby'])) : 'date';
+		$order = isset($_POST['order']) ? sanitize_text_field(wp_unslash($_POST['order'])) : 'DESC';
 
 		$args = array(
 			'post_type'      => 'event_listing',
@@ -374,7 +449,7 @@ class WP_Event_Manager_Ajax {
 
 			while ($upcoming_events->have_posts()) {
 				$upcoming_events->the_post();
-				get_event_manager_template_part('content', 'past_event_listing');
+				wpem_get_event_manager_template_part('content', 'past_event_listing');
 			}
 
 			$events_html = ob_get_clean();
@@ -403,21 +478,39 @@ class WP_Event_Manager_Ajax {
 	 * Get listings via ajax.
 	 */
 	public function get_listings() {
+		// Security: Verify nonce for AJAX requests
+		if ( defined( 'DOING_AJAX' ) && DOING_AJAX ) {
+			if ( ! isset( $_REQUEST['wpem_filter_nonce'] ) 
+				|| ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_REQUEST['wpem_filter_nonce'] ) ), 'wpem_filter_action' ) ) {
+				wp_send_json_error([
+					'code'    => 403,
+					'message' => '<div class="wpem-alert wpem-alert-danger">' . esc_html__( 'Security check failed.', 'wp-event-manager' ) . '</div>',
+				]);
+				wp_die();
+			}
+		}
+		
 		global $wp_post_types;
 		$result            = array();
-		$search_location   = esc_attr(stripslashes($_REQUEST['search_location']));
-		$search_keywords   = esc_attr(stripslashes($_REQUEST['search_keywords']));
+		$search_location   = isset($_REQUEST['search_location']) ? sanitize_text_field(wp_unslash($_REQUEST['search_location'])) : '';
+		$search_keywords   = isset($_REQUEST['search_keywords']) ? sanitize_text_field(wp_unslash($_REQUEST['search_keywords'])) : '';
 		$post_type_label   = $wp_post_types['event_listing']->labels->name;
-		$orderby           = esc_attr($_REQUEST['orderby']);
+		$orderby           = isset($_REQUEST['orderby']) ? sanitize_text_field(wp_unslash($_REQUEST['orderby'])) : '';
 		$search_datetimes = '';
 		$search_categories = '';
 		$search_event_types = '';
-		$search_ticket_prices = '';
-
+		$search_ticket_prices = "";
 		if (isset($_REQUEST['search_datetimes'])) {
 			$raw_dates = is_array($_REQUEST['search_datetimes']) 
-				? array_filter(array_map('stripslashes', $_REQUEST['search_datetimes'])) 
-				: array_filter([stripslashes($_REQUEST['search_datetimes'])]);
+				? map_deep(wp_unslash($_REQUEST['search_datetimes']), 'sanitize_text_field') 
+				: sanitize_text_field(wp_unslash($_REQUEST['search_datetimes']));
+			// Validate date format before JSON decode
+			if (!empty($raw_dates) && !empty($raw_dates[0])) {
+				// Check if it looks like JSON before decoding
+				if ('{' !== substr($raw_dates[0], 0, 1)) {
+					$raw_dates = array();
+				}
+			}
 
 			if (!empty($raw_dates[0])) {
 				$decoded = json_decode($raw_dates[0], true);
@@ -433,16 +526,22 @@ class WP_Event_Manager_Ajax {
 		}
 
 		if(isset($_REQUEST['search_categories'])) {
-			$search_categories = is_array($_REQUEST['search_categories']) ?  array_filter( array_map('stripslashes', $_REQUEST['search_categories'])) : array_filter(array(stripslashes($_REQUEST['search_categories'])));
+			$search_categories = is_array($_REQUEST['search_categories']) ? map_deep(wp_unslash($_REQUEST['search_categories']), 'sanitize_text_field') : sanitize_text_field(wp_unslash($_REQUEST['search_categories']));
 		}
 
 		if(isset($_REQUEST['search_event_types'])) {
-			$search_event_types =  is_array($_REQUEST['search_event_types']) ?  array_filter( array_map('stripslashes', $_REQUEST['search_event_types'])) :	array_filter(array(stripslashes($_REQUEST['search_event_types'])));
+			$search_event_types = is_array($_REQUEST['search_event_types']) ? 
+				map_deep(wp_unslash($_REQUEST['search_event_types']), 'sanitize_text_field') : 
+				sanitize_text_field(wp_unslash($_REQUEST['search_event_types']));
 		}
 
 		if(isset($_REQUEST['search_ticket_prices'])) {
-			$search_ticket_prices = is_array($_REQUEST['search_ticket_prices']) ?  array_filter( array_map('stripslashes', $_REQUEST['search_ticket_prices'])) : array_filter(array(stripslashes($_REQUEST['search_ticket_prices'])));
-		} 
+			$search_ticket_prices = is_array($_REQUEST['search_ticket_prices']) ? 
+				map_deep(wp_unslash($_REQUEST['search_ticket_prices']), 'sanitize_text_field') : 
+				sanitize_text_field(wp_unslash($_REQUEST['search_ticket_prices']));
+		}
+		$per_page = isset($_REQUEST['per_page']) ? absint(wp_unslash($_REQUEST['per_page'])) : 10;
+		$order = isset($_REQUEST['order']) && in_array(strtoupper(sanitize_text_field(wp_unslash($_REQUEST['order']))), array('ASC', 'DESC'), true) ? strtoupper(sanitize_text_field(wp_unslash($_REQUEST['order']))) : 'DESC';
 		$args = array(
 			'search_location'    	=> $search_location,
 			'search_keywords'    	=> $search_keywords,
@@ -451,10 +550,10 @@ class WP_Event_Manager_Ajax {
 			'search_event_types'  	=> $search_event_types,
 			'search_ticket_prices'	=> $search_ticket_prices,			
 			'orderby'            	=> $orderby,
-			'order'              	=> esc_attr($_REQUEST['order']),
-			'offset'             	=> (absint($_REQUEST['page']) - 1) * absint($_REQUEST['per_page']),
-			'posts_per_page'     	=> absint($_REQUEST['per_page']),
-			'lang'    	            => apply_filters('wpem_set_default_page_language', $_REQUEST['lang']),
+			'order'              	=> $order,
+			'offset'             	=> isset($_REQUEST['page']) ? (absint(wp_unslash($_REQUEST['page'])) - 1) * $per_page : 0,
+			'posts_per_page'     	=> $per_page,
+			'lang'    	            => isset($_REQUEST['lang']) ? apply_filters('wpem_set_default_page_language', sanitize_text_field(wp_unslash($_REQUEST['lang']))) : '',
 		);
 
 		if(isset($_REQUEST['cancelled']) && ($_REQUEST['cancelled'] === 'true' || $_REQUEST['cancelled'] === 'false')) {
@@ -467,11 +566,20 @@ class WP_Event_Manager_Ajax {
 		}
 
 		if(isset($_REQUEST['event_online']) && ($_REQUEST['event_online'] === 'true' || $_REQUEST['event_online'] === 'false')) {
-			$args['event_online'] = $_REQUEST['event_online'] === 'false' ? $_REQUEST['event_online'] : true;
+			$args['event_online'] = ($_REQUEST['event_online'] === 'false') ? sanitize_text_field(wp_unslash($_REQUEST['event_online'])) : true;
 		}
 
 		ob_start();
-		$events = get_event_listings(apply_filters('event_manager_get_listings_args', $args, $_REQUEST));
+		$request_data = wp_unslash( $_REQUEST );
+		$request_data = map_deep( $request_data, 'wp_kses_post' );
+		$events = wpem_get_event_listings(
+			apply_filters(
+				'event_manager_get_listings_args',
+				$args,
+				$request_data
+			)
+		);
+
 		$result['found_events'] = false;
 		$fully_registered_events = 0;
 		if($events->have_posts()) : $result['found_events'] = true;
@@ -482,7 +590,7 @@ class WP_Event_Manager_Ajax {
 					$fully_registered_events++;
 					continue;
 				}
-				get_event_manager_template_part('content', 'event_listing');
+				wpem_get_event_manager_template_part('content', 'event_listing');
 			endwhile; 
 			$events->found_posts -= $fully_registered_events;
 			?>
@@ -494,7 +602,7 @@ class WP_Event_Manager_Ajax {
 			));
 			if(count($default_events) == 0): ?>
 				<div class="no_event_listings_found wpem-alert wpem-alert-danger wpem-mb-0"><?php esc_attr_e('There are currently no events.', 'wp-event-manager'); ?></div>
-			<?php else: get_event_manager_template_part('content', 'no-events-found');
+			<?php else: wpem_get_event_manager_template_part('content', 'no-events-found');
 			endif;
 		endif;
 
@@ -561,9 +669,19 @@ class WP_Event_Manager_Ajax {
 			$result['filter_value'][] = sprintf(wp_kses('located in &ldquo;%s&rdquo;', 'wp-event-manager') , $search_location) ;
 		}
 
-		if(sizeof($result['filter_value']) > 1) {
-			//translators: %d is the number of matching records found.
-        	$message = sprintf( esc_html(_n('Search completed. Found %d matching record.','Search completed. Found %d matching records.',$events->found_posts,'wp-event-manager')), $events->found_posts);
+		if ( sizeof( $result['filter_value'] ) > 1 ) {
+			$message = sprintf(
+				esc_html(
+					/* translators: %d: number of matching records found */
+					_n(
+						'Search completed. Found %d matching record.',
+						'Search completed. Found %d matching records.',
+						$events->found_posts,
+						'wp-event-manager'
+					)
+				),
+				(int) $events->found_posts
+			);
 			$result['showing_applied_filters'] = true;
 		} else {
 			$message = "";
@@ -571,12 +689,12 @@ class WP_Event_Manager_Ajax {
 		}
 		
 		$search_values = array(
-				'location'   => $search_location,
-				'keywords'   => $search_keywords,
-				'datetimes'  => $search_datetimes,
-				'tickets'	 => $search_ticket_prices,
-				'types'		 => $search_event_types,
-				'categories' => $search_categories
+			'location'   => $search_location,
+			'keywords'   => $search_keywords,
+			'datetimes'  => $search_datetimes,
+			'tickets'	 => $search_ticket_prices,
+			'types'		 => $search_event_types,
+			'categories' => $search_categories
 		);
 		$result['filter_value'] = apply_filters('event_manager_get_listings_custom_filter_text', $message, $search_values);
 		
@@ -592,7 +710,8 @@ class WP_Event_Manager_Ajax {
 		
 		// Generate pagination
 		if(isset($_REQUEST['show_pagination']) && $_REQUEST['show_pagination'] === 'true') {
-			$result['pagination'] = get_event_listing_pagination($events->max_num_pages, absint($_REQUEST['page']));
+			$page = isset($_REQUEST['page']) ? absint(wp_unslash($_REQUEST['page'])) : 1;
+			$result['pagination'] = wpem_get_event_listing_pagination($events->max_num_pages, $page);
 		}
 		$result['max_num_pages'] = $events->max_num_pages;
 		wp_send_json(apply_filters('event_manager_get_listings_result', $result, $events));
@@ -612,9 +731,11 @@ class WP_Event_Manager_Ajax {
 		$data = array('files' => array());
 		if(!empty($_FILES)) {
 			foreach ($_FILES as $file_key => $file) {
+				// Sanitize file key
+				$sanitized_file_key = sanitize_key($file_key);
 				$files_to_upload = event_manager_prepare_uploaded_files($file);
 				foreach ($files_to_upload as $file_to_upload) {
-					$uploaded_file = event_manager_upload_file($file_to_upload, array('file_key' => $file_key));
+					$uploaded_file = event_manager_upload_file($file_to_upload, array('file_key' => $sanitized_file_key));
 					if(is_wp_error($uploaded_file)) {
 						$data['files'][] = array('error' => $uploaded_file->get_error_message());
 					} else {
@@ -649,7 +770,7 @@ class WP_Event_Manager_Ajax {
 		}
 		
 		if ( ! isset( $_POST['wpem_add_organizer_nonce'] ) 
-			|| ! wp_verify_nonce( $_POST['wpem_add_organizer_nonce'], 'wpem_add_organizer_action' ) ) {
+			|| ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['wpem_add_organizer_nonce'] ) ), 'wpem_add_organizer_action' ) ) {
 			wp_send_json([
 				'code'    => 403,
 				'message' => '<div class="wpem-alert wpem-alert-danger">' . esc_html__( 'Security check failed.', 'wp-event-manager' ) . '</div>',
@@ -658,29 +779,72 @@ class WP_Event_Manager_Ajax {
 		}
 
 		$params = array();
-		parse_str($_REQUEST['form_data'], $params);
-		$params['organizer_description'] = sanitize_text_field($_REQUEST['organizer_description']);
+		$form_data_raw = filter_input( INPUT_POST, 'form_data', FILTER_UNSAFE_RAW );
+
+		if ( ! empty( $form_data_raw ) ) {
+			// Remove WP slashes
+			$form_data_raw = wp_unslash( $form_data_raw );
+
+			// Convert &amp; back to &
+			$form_data_raw = html_entity_decode( $form_data_raw, ENT_QUOTES, 'UTF-8' );
+
+			// Parse query string
+			parse_str( $form_data_raw, $params );
+
+			$sanitized = [];
+
+			foreach ( $params as $key => $value ) {
+
+				// Sanitize key itself
+				$safe_key = sanitize_key( $key );
+
+				// Handle arrays (checkboxes, multiselects)
+				if ( is_array( $value ) ) {
+					$sanitized[ $safe_key ] = array_map( 'sanitize_text_field', $value );
+					continue;
+				}
+
+				// Auto-detect value type
+				if ( is_email( $value ) ) {
+					$sanitized[ $safe_key ] = sanitize_email( $value );
+				} elseif ( is_numeric( $value ) ) {
+					$sanitized[ $safe_key ] = $value + 0;
+				} elseif ( wp_http_validate_url( $value ) ) {
+					$sanitized[ $safe_key ] = esc_url_raw( $value );
+				} else {
+					// Allow safe HTML (for textarea / editors)
+					$sanitized[ $safe_key ] = wp_kses_post( $value );
+				}
+			}
+		}
+		$organizer_description = isset( $_POST['organizer_description'] ) ? wp_kses_post( wp_unslash( $_POST['organizer_description'] ) ) : '';
+
+		$params = $sanitized;		
+		$params['organizer_description'] = $organizer_description;
 		$params['submit_organizer'] = 'Submit';
-
 		$data = [];
-
-		if(!empty($params['organizer_name']) && isset($params['organizer_id'])  && $params['organizer_id'] == 0){
-			$_POST = $params;
+		if(!empty($params['organizer_name'])){
 
 			if(isset($_COOKIE['wp-event-manager-submitting-organizer-id']))
 			    unset($_COOKIE['wp-event-manager-submitting-organizer-id']);				
 			if(isset($_COOKIE['wp-event-manager-submitting-organizer-key']))
 			    unset($_COOKIE['wp-event-manager-submitting-organizer-key']);
 
+			// Add the required nonce for form submission
+			$organizer_id = isset($params['organizer_id']) ? $params['organizer_id'] : 0;
+			$params['_wpnonce'] = wp_create_nonce('edit-organizer_' . $organizer_id);
+			$_POST = $params;
 			$GLOBALS['event_manager']->forms->get_form('submit-organizer', array());
-			$form_submit_organizer_instance = call_user_func(array('WP_Event_Manager_Form_Submit_Organizer', 'instance'));
-			$event_fields =	$form_submit_organizer_instance->merge_with_custom_fields('frontend');
+			$form_submit_organizer_instance = call_user_func(array('WPEM_Event_Manager_Form_Submit_Organizer', 'instance'));
+			$event_fields =	$form_submit_organizer_instance->wpem_merge_with_custom_fields('frontend');
+
+			// Initialize post_data for the form instance
+			$form_submit_organizer_instance->post_data = $_POST;
 
 			// Submit current event with $_POST values
 			$form_submit_organizer_instance->submit_handler();
 
 			$organizer_id = $form_submit_organizer_instance->get_organizer_id();
-
 			if(isset($organizer_id) && !empty($organizer_id)){
 				$organizer = get_post($organizer_id);
 
@@ -731,7 +895,7 @@ class WP_Event_Manager_Ajax {
 		}
 		
 		if ( ! isset( $_POST['wpem_add_venue_nonce'] ) 
-			|| ! wp_verify_nonce( $_POST['wpem_add_venue_nonce'], 'wpem_add_venue_action' ) ) {
+			|| ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['wpem_add_venue_nonce'] ) ), 'wpem_add_venue_action' ) ) {
 			wp_send_json([
 				'code'    => 403,
 				'message' => '<div class="wpem-alert wpem-alert-danger">' . esc_html__( 'Security check failed.', 'wp-event-manager' ) . '</div>',
@@ -740,13 +904,54 @@ class WP_Event_Manager_Ajax {
 		}
 
 		$params = array();
-		parse_str($_REQUEST['form_data'], $params);
-		$params['venue_description'] = sanitize_text_field($_REQUEST['venue_description']);
+		$form_data_raw = filter_input( INPUT_POST, 'form_data', FILTER_UNSAFE_RAW );
+
+		if ( ! empty( $form_data_raw ) ) {
+			// Remove WP slashes
+			$form_data_raw = wp_unslash( $form_data_raw );
+
+			// Convert &amp; back to &
+			$form_data_raw = html_entity_decode( $form_data_raw, ENT_QUOTES, 'UTF-8' );
+
+			// Parse query string
+			parse_str( $form_data_raw, $params );
+
+			$sanitized = [];
+
+			foreach ( $params as $key => $value ) {
+
+				// Sanitize key itself
+				$safe_key = sanitize_key( $key );
+
+				// Handle arrays (checkboxes, multiselects)
+				if ( is_array( $value ) ) {
+					$sanitized[ $safe_key ] = array_map( 'sanitize_text_field', $value );
+					continue;
+				}
+
+				// Auto-detect value type
+				if ( is_email( $value ) ) {
+					$sanitized[ $safe_key ] = sanitize_email( $value );
+				} elseif ( is_numeric( $value ) ) {
+					$sanitized[ $safe_key ] = $value + 0;
+				} elseif ( wp_http_validate_url( $value ) ) {
+					$sanitized[ $safe_key ] = esc_url_raw( $value );
+				} else {
+					// Allow safe HTML (for textarea / editors)
+					$sanitized[ $safe_key ] = wp_kses_post( $value );
+				}
+			}
+		}
+
+		$params = $sanitized;
+		$params['venue_description'] = isset( $_POST['venue_description'] ) ? wp_kses_post( wp_unslash( $_POST['venue_description'] ) ) : '';
 		$params['submit_venue'] = 'Submit';
 
 		$data = [];
-
 		if(!empty($params['venue_name']) && isset($params['venue_id'])  && $params['venue_id'] == 0) {
+			// Add the required nonce for form submission
+			$venue_id = isset($params['venue_id']) ? $params['venue_id'] : 0;
+			$params['_wpnonce'] = wp_create_nonce('edit-venue_' . $venue_id);
 			$_POST = $params;
 
 			if(isset($_COOKIE['wp-event-manager-submitting-venue-id']))
@@ -755,8 +960,11 @@ class WP_Event_Manager_Ajax {
 			    unset($_COOKIE['wp-event-manager-submitting-venue-key']);
 
 			$GLOBALS['event_manager']->forms->get_form('submit-venue', array());
-			$form_submit_venue_instance = call_user_func(array('WP_Event_Manager_Form_Submit_Venue', 'instance'));
-			$event_fields =	$form_submit_venue_instance->merge_with_custom_fields('frontend');
+			$form_submit_venue_instance = call_user_func(array('WPEM_Event_Manager_Form_Submit_Venue', 'instance'));
+			$event_fields =	$form_submit_venue_instance->wpem_merge_with_custom_fields('frontend');
+
+			// Initialize post_data for the form instance
+			$form_submit_venue_instance->post_data = $_POST;
 
 			// Submit current event with $_POST values
 			$form_submit_venue_instance->submit_handler();
@@ -789,4 +997,4 @@ class WP_Event_Manager_Ajax {
 		wp_die();
 	}
 }
- WP_Event_Manager_Ajax::instance();
+WP_Event_Manager_Ajax::instance();
